@@ -115,7 +115,7 @@ Di soal ini, satu container mewakili satu grup host. Jadi angka 500 bukan berart
 | Switch-Terminal | `e2` | `eth0` | Magi-Balthasar |
 | Switch-Terminal | `e3` | `eth0` | Magi-Melchior |
 
-Tabel subnetting ada di [file ini](Pembagian%20IP.xlsx)  
+Tabel subnetting ada di [file ini](Pembagian-IP.pdf)  
 Tree VLSM ada di [file ini](TREE.png)  
   
 Perhitungan Subnet Kedua — A2 (`10.93.2.0/24`)
