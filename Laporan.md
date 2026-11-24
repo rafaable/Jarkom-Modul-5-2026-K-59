@@ -1002,6 +1002,9 @@ Untuk menguji bahwa setiap link point-to-point telah terhubung dan dapat saling 
 * Membuktikan Armisael bisa ping ke Lilith, Sachiel, dan Comm-Net
   
 > Pada soal ini, seluruh segmen jaringan yang sebelumnya terisolasi dihubungkan menggunakan routing statis hierarkis. Router Gendou berada di posisi root dengan default route mengarah ke NAT1, serta memiliki entri routing ke seluruh cabang di bawahnya. Pada cabang router Shigeru, subnet Switch-Monolith (A13: `10.93.4.80/29`) dan Switch-Radar (A14: `10.93.4.88/29`) digabungkan (*route summarization*) menjadi satu CIDR `10.93.4.80/28`. Semua router selain Gendou hanya memerlukan satu *default route* menuju router induk di atasnya serta rute spesifik ke cabang di bawahnya (bila ada). Selain itu, 4 node uji (Armisael, Lilith, Sachiel, dan Comm-Net) diberikan konfigurasi IP dan gateway sementara untuk menguji konektivitas end-to-end antar-cabang.
+>
+> **Catatan Penggunaan `ip route replace`:**  
+> Seluruh skrip routing menggunakan perintah `ip route replace` alih-alih `ip route add`. Perintah `add` akan menghasilkan pesan kesalahan `RTNETLINK answers: File exists` jika rute sudah pernah dibuat sebelumnya (misalnya saat pengujian atau demonstrasi ulang). Sebaliknya, perintah `replace` bersifat idempoten (*upsert*), yaitu menambahkan jika rute belum ada atau memperbarui rute tanpa memunculkan error jika sudah ada, sehingga skrip dapat dieksekusi berulang kali secara aman.
 
 ### Langkah Pengerjaan
 
@@ -1395,33 +1398,149 @@ chmod +x /root/soal3.sh
 
 ### Testing
 
-Pengujian konektivitas routing antar-cabang dilakukan langsung dari terminal node **Armisael**:
+Pengujian Soal 3 dilakukan untuk membuktikan seluruh 6 poin persyaratan yang diminta pada soal:
 
-1. Menampilkan konfigurasi IP antarmuka dan default route pada Armisael:
+1. **Menghubungkan Seluruh Subnet Menggunakan Static Routing**  
+   *Membuktikan: Seluruh router dikonfigurasi menggunakan static route tanpa ketergantungan protokol dinamis.*  
+   Jalankan di salah satu router perantara, misalnya node **Yui**:
    ```bash
-   ip -br a
    ip route
    ```
-
-2. Menguji ping ke gateway lokal Shigeru:
-   ```bash
-   ping -c 2 10.93.4.81
+   *Output verifikasi:*
+   ```text
+   default via 10.93.4.117 dev eth0
+   10.93.0.0/23 via 10.93.4.134 dev eth1
+   10.93.3.0/25 via 10.93.4.110 dev eth2
+   10.93.4.0/27 via 10.93.4.110 dev eth2
+   10.93.4.32/28 via 10.93.4.110 dev eth2
+   10.93.4.108/30 dev eth2 proto kernel scope link src 10.93.4.109
+   10.93.4.116/30 dev eth0 proto kernel scope link src 10.93.4.118
+   10.93.4.132/30 dev eth1 proto kernel scope link src 10.93.4.133
+   10.93.4.136/30 via 10.93.4.134 dev eth1
    ```
+   *Hasil: Terlihat seluruh subnet terhubung dengan rute statis menuju cabang masing-masing.*
 
-3. Menguji ping ke **Lilith** (Switch-Dogma, cabang Fuyutsuki):
+2. **Menyusun Rute dari Gendo ke Router-Router di Bawahnya**  
+   *Membuktikan: Router Gendou memiliki rute lengkap ke 7 cabang anak (Yui, Hikari, Asuka, Kaji, Misato, Shigeru, Fuyutsuki).*  
+   Jalankan di node **Gendou**:
    ```bash
+   ip route
+   ```
+   *Output verifikasi rute cabang:*
+   ```text
+   # Cabang Yui
+   10.93.0.0/23 via 10.93.4.118 dev eth1
+   10.93.3.0/25 via 10.93.4.118 dev eth1
+   10.93.4.0/27 via 10.93.4.118 dev eth1
+   10.93.4.32/28 via 10.93.4.118 dev eth1
+   10.93.4.108/30 via 10.93.4.118 dev eth1
+   10.93.4.132/30 via 10.93.4.118 dev eth1
+   10.93.4.136/30 via 10.93.4.118 dev eth1
+   # Cabang Hikari
+   10.93.2.0/24 via 10.93.4.114 dev eth2
+   10.93.3.224/27 via 10.93.4.114 dev eth2
+   10.93.4.128/30 via 10.93.4.114 dev eth2
+   # Cabang Asuka
+   10.93.3.128/26 via 10.93.4.166 dev eth3
+   10.93.4.48/29 via 10.93.4.166 dev eth3
+   10.93.4.96/30 via 10.93.4.166 dev eth3
+   10.93.4.120/30 via 10.93.4.166 dev eth3
+   10.93.4.140/30 via 10.93.4.166 dev eth3
+   # Cabang Kaji
+   10.93.4.100/30 via 10.93.4.170 dev eth4
+   # Cabang Misato
+   10.93.4.64/29 via 10.93.4.150 dev eth5
+   # Cabang Shigeru (Summarized CIDR)
+   10.93.4.80/28 via 10.93.4.158 dev eth6
+   10.93.4.160/30 via 10.93.4.158 dev eth6
+   # Cabang Fuyutsuki
+   10.93.3.192/27 via 10.93.4.146 dev eth7
+   10.93.4.56/29 via 10.93.4.146 dev eth7
+   10.93.4.72/29 via 10.93.4.146 dev eth7
+   10.93.4.124/30 via 10.93.4.146 dev eth7
+   10.93.4.152/30 via 10.93.4.146 dev eth7
+   ```
+   *Hasil: Gendou memiliki pemetaan rute lengkap untuk mengarahkan lalu lintas ke setiap cabang di bawahnya.*
+
+3. **Menggunakan Satu Default Route ke Router Atas untuk Router Selain Gendo**  
+   *Membuktikan: Setiap router anak hanya membutuhkan satu rute default (`default via ...`) menuju router atasnya untuk semua tujuan di luar cabangnya.*  
+   Jalankan di router daun (misal **Shinji**) dan router perantara (misal **Shigeru**):
+   ```bash
+   # Di node Shinji:
+   ip route show default
+   # Di node Shigeru:
+   ip route show default
+   ```
+   *Output verifikasi:*
+   * Pada **Shinji**: `default via 10.93.4.133 dev eth0` (mengarah ke induknya, Yui).
+   * Pada **Shigeru**: `default via 10.93.4.157 dev eth0` (mengarah ke induknya, Gendou).
+   *Hasil: Tepat hanya terdapat satu baris default route pada setiap router selain Gendou.*
+
+4. **Menggabungkan Subnet Cabang yang Berurutan Menjadi Satu CIDR (Route Summarization)**  
+   *Membuktikan: Subnet Switch-Monolith (A13: `10.93.4.80/29`) dan Switch-Radar (A14: `10.93.4.88/29`) diringkas menjadi satu CIDR `10.93.4.80/28`.*  
+   
+   a. **Verifikasi Tabel Routing Gendou:**  
+   Jalankan di node **Gendou**:
+   ```bash
+   ip route | grep 10.93.4.80
+   ```
+   *Output:*
+   ```text
+   10.93.4.80/28 via 10.93.4.158 dev eth6
+   ```
+   *(Terbukti hanya terdapat 1 entri agregat `/28` untuk kedua subnet, bukan 2 entri terpisah `/29`).*
+
+   b. **Verifikasi FIB Lookup (`ip route get`) pada Gendou:**  
+   Jalankan di node **Gendou**:
+   ```bash
+   # Uji lookup ke host di Switch-Monolith (Armisael 10.93.4.83):
+   ip route get 10.93.4.83
+   # Uji lookup ke host di Switch-Radar (10.93.4.89):
+   ip route get 10.93.4.89
+   ```
+   *Hasil: Kedua IP dari dua subnet berbeda tersebut sama-sama dipetakan ke rute summary `10.93.4.80/28 via 10.93.4.158 dev eth6`.*
+
+5. **Memberikan IP dan Gateway Sementara pada Node untuk Pengujian**  
+   *Membuktikan: Node uji memiliki konfigurasi IP antarmuka dan default route yang terpasang dengan benar.*  
+   Periksa konfigurasi pada masing-masing node uji:
+   * Di node **Armisael**:
+     ```bash
+     ip -br a show eth0; ip route show default
+     ```
+     *Hasil: IP `10.93.4.83/29`, default gateway `10.93.4.81`.*
+   * Di node **Lilith**:
+     ```bash
+     ip -br a show eth0; ip route show default
+     ```
+     *Hasil: IP `10.93.4.74/29`, default gateway `10.93.4.73`.*
+   * Di node **Sachiel**:
+     ```bash
+     ip -br a show eth0; ip route show default
+     ```
+     *Hasil: IP `10.93.3.130/26`, default gateway `10.93.3.129`.*
+   * Di node **Comm-Net**:
+     ```bash
+     ip -br a show eth0; ip route show default
+     ```
+     *Hasil: IP `10.93.2.2/24`, default gateway `10.93.2.1`.*
+
+6. **Membuktikan Armisael Bisa Ping ke Lilith, Sachiel, dan Comm-Net**  
+   *Membuktikan: Konektivitas end-to-end antar-cabang melintasi router Gendou berjalan 100% tanpa hambatan.*  
+   Jalankan seluruh pengujian dari node **Armisael**:
+   ```bash
+   # 1. Ping ke Lilith (Switch-Dogma, cabang Fuyutsuki/Makoto)
    ping -c 2 10.93.4.74
-   ```
 
-4. Menguji ping ke **Sachiel** (Switch-Bunker, cabang Asuka):
-   ```bash
+   # 2. Ping ke Sachiel (Switch-Bunker, cabang Asuka/Kensuke)
    ping -c 2 10.93.3.130
-   ```
 
-5. Menguji ping ke **Comm-Net** (Switch-Comm, cabang Hikari):
-   ```bash
+   # 3. Ping ke Comm-Net (Switch-Comm, cabang Hikari)
    ping -c 2 10.93.2.2
    ```
+   *Hasil Pengujian:*
+   * Ping ke Lilith: **2 packets transmitted, 2 received, 0% packet loss**.
+   * Ping ke Sachiel: **2 packets transmitted, 2 received, 0% packet loss**.
+   * Ping ke Comm-Net: **2 packets transmitted, 2 received, 0% packet loss**.
 
 
 ---
