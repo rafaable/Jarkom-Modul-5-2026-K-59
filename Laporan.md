@@ -1,4 +1,4 @@
-<img width="1078" height="377" alt="image" src="https://github.com/user-attachments/assets/bc4391f9-b264-435a-98e5-58e2b2b63147" /># Laporan Resmi Praktikum Komdat-Jarkom Modul 1
+<img width="506" height="226" alt="image" src="https://github.com/user-attachments/assets/5a86c211-e263-4213-b565-0c8181d60442" /><img width="586" height="62" alt="image" src="https://github.com/user-attachments/assets/f366aefd-ebce-4b95-b5be-d568fc3ed1a9" /><img width="1078" height="377" alt="image" src="https://github.com/user-attachments/assets/bc4391f9-b264-435a-98e5-58e2b2b63147" /># Laporan Resmi Praktikum Komdat-Jarkom Modul 1
 
 > **Kelompok K-59**
 > * Salsabila Rafa Syafira (5027251059)
@@ -1406,17 +1406,19 @@ Pengujian Soal 3 dilakukan untuk membuktikan seluruh 6 poin persyaratan yang dim
    ```bash
    ip route
    ```
+   <br><img width="594" height="169" alt="image" src="https://github.com/user-attachments/assets/a3c20bbe-dbed-4d6b-8163-1991b9b98541" /><br>
+
    *Output verifikasi:*
    ```text
-   default via 10.93.4.117 dev eth0
-   10.93.0.0/23 via 10.93.4.134 dev eth1
-   10.93.3.0/25 via 10.93.4.110 dev eth2
-   10.93.4.0/27 via 10.93.4.110 dev eth2
-   10.93.4.32/28 via 10.93.4.110 dev eth2
-   10.93.4.108/30 dev eth2 proto kernel scope link src 10.93.4.109
-   10.93.4.116/30 dev eth0 proto kernel scope link src 10.93.4.118
-   10.93.4.132/30 dev eth1 proto kernel scope link src 10.93.4.133
-   10.93.4.136/30 via 10.93.4.134 dev eth1
+   default via 10.93.4.117 dev eth0 
+   10.93.0.0/23 via 10.93.4.110 dev eth3 
+   10.93.3.0/25 dev eth4 proto kernel scope link src 10.93.3.1 
+   10.93.4.0/27 via 10.93.4.134 dev eth1 
+   10.93.4.32/28 via 10.93.4.138 dev eth2 
+   10.93.4.108/30 dev eth3 proto kernel scope link src 10.93.4.109 
+   10.93.4.116/30 dev eth0 proto kernel scope link src 10.93.4.118 
+   10.93.4.132/30 dev eth1 proto kernel scope link src 10.93.4.133 
+   10.93.4.136/30 dev eth2 proto kernel scope link src 10.93.4.137
    ```
    *Hasil: Terlihat seluruh subnet terhubung dengan rute statis menuju cabang masing-masing.*
 
@@ -1426,6 +1428,8 @@ Pengujian Soal 3 dilakukan untuk membuktikan seluruh 6 poin persyaratan yang dim
    ```bash
    ip route
    ```
+   <br><img width="643" height="595" alt="image" src="https://github.com/user-attachments/assets/32db6b7f-8472-4bcd-9767-35ae12b78452" /><br>
+
    *Output verifikasi rute cabang:*
    ```text
    # Cabang Yui
@@ -1471,6 +1475,8 @@ Pengujian Soal 3 dilakukan untuk membuktikan seluruh 6 poin persyaratan yang dim
    # Di node Shigeru:
    ip route show default
    ```
+   <br><img width="339" height="38" alt="image" src="https://github.com/user-attachments/assets/905bfb09-1223-4805-8256-ff1efbad7299" /><br>
+   <br><img width="348" height="40" alt="image" src="https://github.com/user-attachments/assets/a5d538db-9f6e-4011-877d-c1fdc924da55" <br>
    *Output verifikasi:*
    * Pada **Shinji**: `default via 10.93.4.133 dev eth0` (mengarah ke induknya, Yui).
    * Pada **Shigeru**: `default via 10.93.4.157 dev eth0` (mengarah ke induknya, Gendou).
@@ -1484,6 +1490,8 @@ Pengujian Soal 3 dilakukan untuk membuktikan seluruh 6 poin persyaratan yang dim
    ```bash
    ip route | grep 10.93.4.80
    ```
+   <br><img width="387" height="33" alt="image" src="https://github.com/user-attachments/assets/64fc5bb4-d899-43e1-aa00-54068fd82b1e" /><br>
+
    *Output:*
    ```text
    10.93.4.80/28 via 10.93.4.158 dev eth6
@@ -1498,6 +1506,7 @@ Pengujian Soal 3 dilakukan untuk membuktikan seluruh 6 poin persyaratan yang dim
    # Uji lookup ke host di Switch-Radar (10.93.4.89):
    ip route get 10.93.4.89
    ```
+   <br><img width="551" height="95" alt="image" src="https://github.com/user-attachments/assets/9c06ce9f-5548-4753-9224-ad9dcbc3d578" /><br>
    *Hasil: Kedua IP dari dua subnet berbeda tersebut sama-sama dipetakan ke rute summary `10.93.4.80/28 via 10.93.4.158 dev eth6`.*
 
 5. **Memberikan IP dan Gateway Sementara pada Node untuk Pengujian**  
@@ -1507,21 +1516,26 @@ Pengujian Soal 3 dilakukan untuk membuktikan seluruh 6 poin persyaratan yang dim
      ```bash
      ip -br a show eth0; ip route show default
      ```
+     <br><img width="583" height="60" alt="image" src="https://github.com/user-attachments/assets/ac6aba2c-d36e-4fde-a59b-a2fcff98ffbe" /><br>
      *Hasil: IP `10.93.4.83/29`, default gateway `10.93.4.81`.*
    * Di node **Lilith**:
      ```bash
      ip -br a show eth0; ip route show default
      ```
+     <br><img width="555" height="61" alt="image" src="https://github.com/user-attachments/assets/8d8b13c4-eb4b-488f-a4eb-41185bd0cffd" /><br>
+
      *Hasil: IP `10.93.4.74/29`, default gateway `10.93.4.73`.*
    * Di node **Sachiel**:
      ```bash
      ip -br a show eth0; ip route show default
      ```
+     <br><img width="552" height="68" alt="image" src="https://github.com/user-attachments/assets/1af4c06c-f7e6-48dd-b175-60cc5ab0578d" /><br>
      *Hasil: IP `10.93.3.130/26`, default gateway `10.93.3.129`.*
    * Di node **Comm-Net**:
      ```bash
      ip -br a show eth0; ip route show default
      ```
+     <br><img width="586" height="62" alt="image" src="https://github.com/user-attachments/assets/a4c1edc3-bbe6-4d54-b65a-5f0817ddaf6a" /><br>
      *Hasil: IP `10.93.2.2/24`, default gateway `10.93.2.1`.*
 
 6. **Membuktikan Armisael Bisa Ping ke Lilith, Sachiel, dan Comm-Net**  
@@ -1537,12 +1551,11 @@ Pengujian Soal 3 dilakukan untuk membuktikan seluruh 6 poin persyaratan yang dim
    # 3. Ping ke Comm-Net (Switch-Comm, cabang Hikari)
    ping -c 2 10.93.2.2
    ```
+   <br><img width="738" height="579" alt="image" src="https://github.com/user-attachments/assets/826ffaad-5811-4b53-8968-b895d0521679" /><br>
    *Hasil Pengujian:*
    * Ping ke Lilith: **2 packets transmitted, 2 received, 0% packet loss**.
    * Ping ke Sachiel: **2 packets transmitted, 2 received, 0% packet loss**.
    * Ping ke Comm-Net: **2 packets transmitted, 2 received, 0% packet loss**.
-
-
 ---
 
 ## Soal 4
@@ -1641,6 +1654,7 @@ Pengujian keberhasilan konfigurasi Soal 4 dilakukan untuk membuktikan seluruh kr
      ```bash
      iptables -t nat -nvL POSTROUTING
      ```
+     <br><img width="578" height="218" alt="image" src="https://github.com/user-attachments/assets/f9c91a8c-ab32-42f5-ba19-c05e932966d9" /><br>
      *(Counter `pkts` dan `bytes` terlihat bertambah, membuktikan bahwa traffic internet yang melintas dari jaringan internal berhasil ditranslasikan oleh rule MASQUERADE).*
 
 2. **Memverifikasi Komunikasi Antar-LAN Tidak Terkena NAT**  
@@ -1653,6 +1667,8 @@ Pengujian keberhasilan konfigurasi Soal 4 dilakukan untuk membuktikan seluruh kr
      ```bash
      ping -c 2 10.93.4.74
      ```
+     <br><img width="579" height="143" alt="image" src="https://github.com/user-attachments/assets/05a5bbba-42b2-4f10-bcd3-7f0600b4ade8" /><br>
+
    *Output tcpdump pada Lilith menampilkan `IP 10.93.4.83 > 10.93.4.74: ICMP echo request`, membuktikan bahwa paket tiba dengan source IP asli Armisael (`10.93.4.83`) dan bukan IP router atau IP NAT.*
 
 3. **Pengujian Konektivitas Internet dan Domain (DNS) dari Node Armisael**  
@@ -1661,6 +1677,7 @@ Pengujian keberhasilan konfigurasi Soal 4 dilakukan untuk membuktikan seluruh kr
    ping -c 2 8.8.8.8
    ping -c 2 deb.debian.org
    ```
+   <br><img width="498" height="244" alt="image" src="https://github.com/user-attachments/assets/b5fc2763-b69e-4c4b-8c3a-eaecd9ae19fe" /><br>
 
 4. **Pengujian Konektivitas Internet dan Domain (DNS) dari Node Lilith**  
    Jalankan di node **Lilith**:
@@ -1668,6 +1685,7 @@ Pengujian keberhasilan konfigurasi Soal 4 dilakukan untuk membuktikan seluruh kr
    ping -c 2 8.8.8.8
    ping -c 2 deb.debian.org
    ```
+   <br>![Uploading image.png<br>
 ---
 
 ## Soal 5
@@ -1812,6 +1830,7 @@ Pengujian Soal 5 membuktikan seluruh 9 poin persyaratan yang diminta pada soal:
    ```bash
    iptables -nvL
    ```
+   <br><img width="1103" height="271" alt="image" src="https://github.com/user-attachments/assets/834883a8-08d8-4662-85ae-da23aa9d7591" /><br>
    *Output verifikasi:*
    ```text
    Chain INPUT (policy DROP 0 packets, 0 bytes)
@@ -1836,6 +1855,7 @@ Pengujian Soal 5 membuktikan seluruh 9 poin persyaratan yang diminta pada soal:
    ```bash
    ping -c 2 127.0.0.1
    ```
+   <br><img width="604" height="134" alt="image" src="https://github.com/user-attachments/assets/c9b814d8-32df-4fea-b89a-743b67189651" /><br>
    *Hasil: Berhasil (2 packets transmitted, 2 received, 0% packet loss).*
 
 4. **Membuktikan Akses Internet dari Jaringan Internal dan Koneksi Balasan Berjalan**  
@@ -1844,6 +1864,7 @@ Pengujian Soal 5 membuktikan seluruh 9 poin persyaratan yang diminta pada soal:
    ```bash
    ping -c 2 8.8.8.8
    ```
+   <br><img width="598" height="158" alt="image" src="https://github.com/user-attachments/assets/87b28864-5884-4dac-a14a-76389f129225" /><br>
    *Hasil: Berhasil (2 packets transmitted, 2 received, 0% packet loss, rtt avg ~20ms).*
 
 5. **Membuktikan Komunikasi Antar-LAN Berhasil**  
@@ -1852,6 +1873,7 @@ Pengujian Soal 5 membuktikan seluruh 9 poin persyaratan yang diminta pada soal:
    ```bash
    ping -c 2 10.93.4.74
    ```
+   <br><img width="583" height="137" alt="image" src="https://github.com/user-attachments/assets/652a147a-1b5b-433d-a696-5231c88845dc" /><br>
    *Hasil: Berhasil ping ke Lilith di Switch-Dogma (0% packet loss).*
 
 6. **Membuktikan Jaringan Internal Bisa Mengakses Gendou**  
@@ -1860,6 +1882,7 @@ Pengujian Soal 5 membuktikan seluruh 9 poin persyaratan yang diminta pada soal:
    ```bash
    ping -c 2 10.93.4.157
    ```
+   <br><img width="613" height="134" alt="image" src="https://github.com/user-attachments/assets/399f4e82-2200-4aef-9315-c5ab68185a42" /><br>
    *Hasil: Berhasil ping ke IP Gendou (0% packet loss).*
 
 7. **Membuktikan Koneksi Baru dari NAT1 Tidak Bisa Masuk**  
