@@ -1,4 +1,4 @@
-<img width="506" height="226" alt="image" src="https://github.com/user-attachments/assets/5a86c211-e263-4213-b565-0c8181d60442" /><img width="586" height="62" alt="image" src="https://github.com/user-attachments/assets/f366aefd-ebce-4b95-b5be-d568fc3ed1a9" /><img width="1078" height="377" alt="image" src="https://github.com/user-attachments/assets/bc4391f9-b264-435a-98e5-58e2b2b63147" /># Laporan Resmi Praktikum Komdat-Jarkom Modul 1
+# Laporan Resmi Praktikum Komdat-Jarkom Modul 1
 
 > **Kelompok K-59**
 > * Salsabila Rafa Syafira (5027251059)
@@ -1648,7 +1648,7 @@ Pengujian keberhasilan konfigurasi Soal 4 dilakukan untuk membuktikan seluruh kr
      ping -c 2 8.8.8.8
      ping -c 2 deb.debian.org
      ```
-
+     <img width="506" height="226" alt="image" src="https://github.com/user-attachments/assets/5a86c211-e263-4213-b565-0c8181d60442" />
    - **Langkah 3 (Kondisi Akhir / Bukti Counter Bertambah):**  
      Jalankan kembali di node **Gendou**:
      ```bash
