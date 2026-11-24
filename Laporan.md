@@ -1,4 +1,4 @@
-# Laporan Resmi Praktikum Komdat-Jarkom Modul 1
+<img width="1078" height="377" alt="image" src="https://github.com/user-attachments/assets/bc4391f9-b264-435a-98e5-58e2b2b63147" /># Laporan Resmi Praktikum Komdat-Jarkom Modul 1
 
 > **Kelompok K-59**
 > * Salsabila Rafa Syafira (5027251059)
@@ -890,18 +890,21 @@ Untuk membuktikan seluruh persyaratan Soal 2 telah terpenuhi:
    ```bash
    cat /proc/sys/net/ipv4/ip_forward
    ```
+   <br><img width="538" height="50" alt="image" src="https://github.com/user-attachments/assets/4844f1bf-b9f7-4c02-90d5-7f7390a4a539" /><br>
 
 2. **Verifikasi Antarmuka & IP Address**  
    Jalankan perintah berikut di router untuk memastikan IP terpasang dengan benar:
    ```bash
    ip -br a
    ```
+   <br><img width="1078" height="377" alt="image" src="https://github.com/user-attachments/assets/a736968a-c7f6-4166-a030-5afccc1be4f9" /><br>
 
 3. **Verifikasi DHCP NAT1 pada Router Gendou**  
    Jalankan di node **Gendou** untuk memastikan antarmuka `eth0` memperoleh IP otomatis:
    ```bash
    ip -br a show eth0
    ```
+   <br><img width="577" height="51" alt="image" src="https://github.com/user-attachments/assets/54171397-397d-4373-b6d8-96af6f75c1c0" /><br>
 
 4. **Tabel Link Point-to-Point Antar-Router**
 
@@ -946,6 +949,7 @@ Untuk menguji bahwa setiap link point-to-point telah terhubung dan dapat saling 
   ping -c 2 10.93.4.134  # Link B7 ke Shinji
   ping -c 2 10.93.4.138  # Link B8 ke Mari
   ```
+  <br><img width="698" height="716" alt="image" src="https://github.com/user-attachments/assets/6a07c67d-573c-4d43-b0bb-052876bb4c90" /><br>
 
 - **Pada node Hikari** (menguji link B2, B6):
   ```bash
