@@ -1891,30 +1891,61 @@ Pengujian Soal 5 membuktikan seluruh 9 poin persyaratan yang diminta pada soal:
 ---
 
 ## Soal 6
-> Penafsiran soal dan secara ringkas kita disuruh ngapain aja
+>- Mengatur konfigurasi IP statis secara permanen pada seluruh end-device (host/node) agar tidak hilang saat node di-restart
+- Menerapkan alamat IP, netmask, dan default gateway pada setiap node berdasarkan tabel VLSM Soal 1
+- Melakukan pengujian persistensi konfigurasi pada node **Unit-01** setelah restart menggunakan perintah `ip -br a` dan `ping -c 3 10.93.4.65`
 
-1. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-      ```bash
-      # Contoh kode perintah
-      ini kode
-      ```
-      
-      atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-      ```
-      isi script
-      ```
-2. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
+> Berbeda dengan konfigurasi sementara menggunakan script `/root/soal3.sh` yang akan terhapus ketika node di-restart, pada soal ini pengalamatan IP dikonfigurasi secara permanen melalui file konfigurasi jaringan (`/etc/network/interfaces`) di setiap end-device. Pengujian dilakukan dengan me-restart node **Unit-01** dan memverifikasi bahwa IP address serta konektivitas ke gateway tetap bertahan tanpa menjalankan ulang script sementara.
 
-    ```bash
-    # Contoh kode perintah
-    ini kode
-    ```
-    
-    atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-    ```
-    isi script
-    ```
-dst terserah butuh berapa step
+### Langkah Pengerjaan
+
+#### 1. Tabel Pembagian IP Address End-Device
+
+Berikut adalah daftar pemetaan IP statis, netmask, dan gateway untuk seluruh node berdasarkan perhitungan VLSM:
+
+| Node | IP Address | Netmask | Gateway |
+| :--- | :--- | :--- | :--- |
+| **Quarters** | `10.93.0.2` | `255.255.254.0` | `10.93.0.1` |
+| **Comm-Net** | `10.93.2.2` | `255.255.255.0` | `10.93.2.1` |
+| **Hangar-Crew** | `10.93.3.2` | `255.255.255.128` | `10.93.3.1` |
+| **Sachiel** | `10.93.3.130` | `255.255.255.192` | `10.93.3.129` |
+| **Medic-Bay**|  `10.93.3.195` | `255.255.255.224` | `10.93.3.193` |
+| **Pen-Pen** |  `10.93.3.194` | `255.255.255.224` | `10.93.3.193` |
+| **Relay-Node** | `10.93.3.226` | `255.255.255.224` | `10.93.3.225` |
+| **Garden-Staff** | `10.93.4.2` | `255.255.255.224` | `10.93.4.1` |
+| **Dock-Crew** | `10.93.4.34` | `255.255.255.240` | `10.93.4.33` |
+| **Entry-Plug** | `10.93.4.50` | `255.255.255.248` | `10.93.4.49` |
+| **Dummy-Plug** | `10.93.4.51` | `255.255.255.248` | `10.93.4.49` |
+| **Magi-Casper** | `10.93.4.58` | `255.255.255.248` | `10.93.4.57` |
+| **Magi-Balthasar** | `10.93.4.59` | `255.255.255.248` | `10.93.4.57` |
+| **Magi-Melchior** | `10.93.4.60` | `255.255.255.248` | `10.93.4.57` |
+| **Unit-01** | `10.93.4.66` | `255.255.255.248` | `10.93.4.65` |
+| **Unit-02** | `10.93.4.67` | `255.255.255.248` | `10.93.4.65` |
+| **Unit-00** | `10.93.4.68` | `255.255.255.248` | `10.93.4.65` |
+
+> **Catatan Switch-Medic:** Penentuan urutan IP pada segmen Switch-Medic (`10.93.3.192/27`) disesuaikan dengan konfirmasi asisten (mengikuti topologi gambar: **Medic-Bay** `.194` & **Pen-Pen** `.195`, atau mengikuti Tabel Host: **Pen-Pen** `.194` & **Medic-Bay** `.195`).
+
+---
+#### 2. Edit Network Configuration pada Setiap Node
+
+Langkah konfigurasi dilakukan melalui antarmuka GNS3:
+**Klik kanan pada node > Configure > Edit Network Configuration**, lalu masukkan konfigurasi berikut dan klik **Save**.
+
+<details>
+<summary>1. Pada node <b>Quarters</b></summary>
+
+```text
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet static
+    address 10.93.0.2
+    netmask 255.255.254.0
+    gateway 10.93.0.1
+```
+#### 3.Pengujian Persistensi Konfigurasi pada Unit-01
+<img width="1112" height="826" alt="image" src="https://github.com/user-attachments/assets/2942ff9b-8194-411e-8b78-5c00a9411460" />
 
 ---
 
