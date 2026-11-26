@@ -3319,12 +3319,13 @@ Di Node **Pen-Pen** `nano /root/soal17_testing.sh`:
 
 ```bash
 #!/bin/sh
-# Menyiapkan listener port 9000 di Pen-Pen
-pkill -f "nc -l -p 9000" 2>/dev/null
+# Menyiapkan listener port 9000 di Pen-Pen (persistent loop agar tetap LISTEN setelah menerima koneksi)
+pkill -9 -f "nc -l -p 9000" 2>/dev/null
+pkill -9 -f "sh -c while true" 2>/dev/null
 rm -f /tmp/penpen.txt
 touch /tmp/penpen.txt
-nohup nc -l -p 9000 > /tmp/penpen.txt 2>&1 &
-echo "Listener port 9000 di Pen-Pen aktif."
+nohup sh -c 'while true; do nc -l -p 9000 >> /tmp/penpen.txt; done' >/dev/null 2>&1 &
+echo "Listener port 9000 di Pen-Pen aktif (persistent)."
 ```
 </details>
 
@@ -3343,12 +3344,13 @@ Di Node **Zeruel** `nano /root/soal17_testing.sh`:
 
 ```bash
 #!/bin/sh
-# Menyiapkan listener port 9000 di Zeruel
-pkill -f "nc -l -p 9000" 2>/dev/null
+# Menyiapkan listener port 9000 di Zeruel (persistent loop agar tetap LISTEN setelah menerima koneksi)
+pkill -9 -f "nc -l -p 9000" 2>/dev/null
+pkill -9 -f "sh -c while true" 2>/dev/null
 rm -f /tmp/zeruel.txt
 touch /tmp/zeruel.txt
-nohup nc -l -p 9000 > /tmp/zeruel.txt 2>&1 &
-echo "Listener port 9000 di Zeruel aktif."
+nohup sh -c 'while true; do nc -l -p 9000 >> /tmp/zeruel.txt; done' >/dev/null 2>&1 &
+echo "Listener port 9000 di Zeruel aktif (persistent)."
 ```
 </details>
 
@@ -3466,7 +3468,7 @@ chmod +x /root/soal17_testing.sh
    ```text
    tcp        0      0 0.0.0.0:9000            0.0.0.0:*               LISTEN
    ```
-   *Penjelasan:* Kedua node siap menerima koneksi masuk pada port 9000 dan mengalirkan data yang diterima ke file penampung masing-masing (`/tmp/penpen.txt` dan `/tmp/zeruel.txt`).
+   *Penjelasan:* Kedua node siap menerima koneksi masuk pada port 9000 dan mengalirkan data yang diterima ke file penampung masing-masing (`/tmp/penpen.txt` dan `/tmp/zeruel.txt`). Listener dijalankan dalam loop background (`while true; do nc -l ...`) sehingga port 9000 tetap berstatus `LISTEN` secara persisten dan tidak mati setelah satu kali koneksi selesai.
 
 7. **Buktikan Pesan dari Casper ke IP Zeruel Masuk ke Pen-Pen, Bukan Zeruel**  
    *Membuktikan: Pesan yang dikirimkan Casper ke IP Zeruel benar-benar mendarat di Pen-Pen, dan Zeruel sama sekali tidak menerima pesan tersebut.*  
