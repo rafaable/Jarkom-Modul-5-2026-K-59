@@ -1950,173 +1950,339 @@ iface eth0 inet static
 ---
 
 ## Soal 7
-> Penafsiran soal dan secara ringkas kita disuruh ngapain aja
+> Memasang `iptables` dan `netcat-traditional` di tiga node MAGI (Casper, Balthasar, Melchior) lewat script di `/root`, lalu menyalakan listener TCP sesuai glosarium (Casper 5000, Balthasar 5000 dan 5001, Melchior 5000). Node MAGI memakai image `debinet` karena `netcat-traditional` adalah paket Debian. Pengujian dilakukan dari Lilith.
 
-1. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-      ```bash
-      # Contoh kode perintah
-      ini kode
-      ```
-      
-      atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-      ```
-      isi script
-      ```
-2. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-
-    ```bash
-    # Contoh kode perintah
-    ini kode
-    ```
-    
-    atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-    ```
-    isi script
-    ```
-dst terserah butuh berapa step
+1. Buat script di `Magi-Casper` (SCRIPT DITULIS DI ROOT SUPAYA BISA DIDEMONSTRASIKAN ULANG):
+   ```bash
+   cat > /root/casper.sh << 'EOF'
+   #!/bin/sh
+   echo "nameserver 8.8.8.8" > /etc/resolv.conf
+   command -v iptables >/dev/null || { apt-get update; apt-get install -y iptables; }
+   dpkg -s netcat-traditional >/dev/null 2>&1 || { apt-get update; apt-get install -y netcat-traditional; }
+   update-alternatives --set nc /bin/nc.traditional 2>/dev/null
+   pkill -f "nc -l -p" 2>/dev/null
+   nohup sh -c 'while true; do nc -l -p 5000 >> /root/nc5000.log; done' >/dev/null 2>&1 &
+   EOF
+   chmod +x /root/casper.sh
+   /root/casper.sh
+   netstat -tln | grep 5000
+   ```
+2. Buat script di `Magi-Balthasar` (dua port):
+   ```bash
+   cat > /root/balthasar.sh << 'EOF'
+   #!/bin/sh
+   echo "nameserver 8.8.8.8" > /etc/resolv.conf
+   command -v iptables >/dev/null || { apt-get update; apt-get install -y iptables; }
+   dpkg -s netcat-traditional >/dev/null 2>&1 || { apt-get update; apt-get install -y netcat-traditional; }
+   update-alternatives --set nc /bin/nc.traditional 2>/dev/null
+   pkill -f "nc -l -p" 2>/dev/null
+   nohup sh -c 'while true; do nc -l -p 5000 >> /root/nc5000.log; done' >/dev/null 2>&1 &
+   nohup sh -c 'while true; do nc -l -p 5001 >> /root/nc5001.log; done' >/dev/null 2>&1 &
+   EOF
+   chmod +x /root/balthasar.sh
+   /root/balthasar.sh
+   netstat -tln | grep -E '5000|5001'
+   ```
+3. Buat script di `Magi-Melchior` (sama seperti Casper, hanya port 5000):
+   ```bash
+   cat > /root/melchior.sh << 'EOF'
+   #!/bin/sh
+   echo "nameserver 8.8.8.8" > /etc/resolv.conf
+   command -v iptables >/dev/null || { apt-get update; apt-get install -y iptables; }
+   dpkg -s netcat-traditional >/dev/null 2>&1 || { apt-get update; apt-get install -y netcat-traditional; }
+   update-alternatives --set nc /bin/nc.traditional 2>/dev/null
+   pkill -f "nc -l -p" 2>/dev/null
+   nohup sh -c 'while true; do nc -l -p 5000 >> /root/nc5000.log; done' >/dev/null 2>&1 &
+   EOF
+   chmod +x /root/melchior.sh
+   /root/melchior.sh
+   netstat -tln | grep 5000
+   ```
+4. Dari `Lilith`, kirim pesan ke ketiga MAGI dan ke port 5001 Balthasar:
+   ```bash
+   echo "Halo Casper dari Lilith"          | nc -w 3 10.93.4.58 5000
+   echo "Halo Balthasar 5000 dari Lilith"  | nc -w 3 10.93.4.59 5000
+   echo "Halo Balthasar 5001 dari Lilith"  | nc -w 3 10.93.4.59 5001
+   echo "Halo Melchior dari Lilith"        | nc -w 3 10.93.4.60 5000
+   ```
+5. Tampilkan pesan yang diterima di tiap node:
+   ```bash
+   cat /root/nc5000.log      # Casper, Balthasar, Melchior
+   cat /root/nc5001.log      # Balthasar
+   ```
+   [screenshot: `netstat -tln` dan isi log di tiap node]
 
 ---
 
 ## Soal 8
-> Penafsiran soal dan secara ringkas kita disuruh ngapain aja
+> Pen-Pen dan Tokyo3-Core melayani dulu supaya kondisi normalnya terlihat. Port 80 menjawab `Welcome to {hostname}`, port 8080 di Tokyo3-Core menjawab `syifa imutz`. Dari Lilith diuji `nc` ke ketiga port, dan port yang tidak dilayani (22) harus gagal seketika, bukan menggantung. Karena `nc` busybox tidak mencetak pesan error, bukti port tertutup memakai exit code dan durasi koneksi.
 
-1. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-      ```bash
-      # Contoh kode perintah
-      ini kode
-      ```
-      
-      atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-      ```
-      isi script
-      ```
-2. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-
-    ```bash
-    # Contoh kode perintah
-    ini kode
-    ```
-    
-    atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-    ```
-    isi script
-    ```
-dst terserah butuh berapa step
+1. Buat script di `Pen-Pen`:
+   ```bash
+   cat > /root/penpen.sh << 'EOF'
+   #!/bin/sh
+   pkill -f "nc -l -p" 2>/dev/null
+   nohup sh -c 'while true; do echo "Welcome to $(hostname)" | nc -l -p 80; done' >/dev/null 2>&1 &
+   EOF
+   chmod +x /root/penpen.sh
+   /root/penpen.sh
+   netstat -tln
+   ```
+2. Buat script di `Tokyo3-Core`:
+   ```bash
+   cat > /root/tokyo3.sh << 'EOF'
+   #!/bin/sh
+   pkill -f "nc -l -p" 2>/dev/null
+   nohup sh -c 'while true; do echo "Welcome to $(hostname)" | nc -l -p 80; done' >/dev/null 2>&1 &
+   nohup sh -c 'while true; do echo "syifa imutz" | nc -l -p 8080; done' >/dev/null 2>&1 &
+   EOF
+   chmod +x /root/tokyo3.sh
+   /root/tokyo3.sh
+   netstat -tln
+   ```
+3. Dari `Lilith`, uji ketiga port:
+   ```bash
+   nc -w 3 <IP-Pen-Pen> 80      # Welcome to Pen-Pen
+   nc -w 3 10.93.4.106 80       # Welcome to Tokyo3-Core
+   nc -w 3 10.93.4.106 8080     # syifa imutz
+   ```
+   [screenshot: ketiga output]
+4. Buktikan port yang tidak dilayani langsung gagal:
+   ```bash
+   time nc -w 5 10.93.4.106 22 </dev/null; echo "exit=$?"
+   time nc -w 5 <IP-Pen-Pen> 22 </dev/null; echo "exit=$?"
+   ```
+   Hasil: selesai dalam hitungan milidetik dengan `exit=1`, artinya ditolak seketika, bukan timeout 5 detik.
+   [screenshot: output `time` dan `exit`]
 
 ---
 
 ## Soal 9
-> Penafsiran soal dan secara ringkas kita disuruh ngapain aja
+> Script `break_routing.sh` dijalankan di Shigeru tanpa dibaca isinya. Gejala: Lilith tidak mendapat jawaban dari Armisael, padahal Armisael masih bisa ping gateway-nya. Kondisi acuan Shigeru: `eth0 10.93.4.158/30`, `eth1 10.93.4.161/30`, `eth2 10.93.4.81/29`, `default via 10.93.4.157 dev eth0`, `10.93.4.88/29 via 10.93.4.162 dev eth1`, `ip_forward = 1`, tanpa `ip rule` tambahan.
 
-1. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-      ```bash
-      # Contoh kode perintah
-      ini kode
-      ```
-      
-      atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-      ```
-      isi script
-      ```
-2. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
+1. Catat kondisi sebelum di `Shigeru`, lalu jalankan script:
+   ```bash
+   ip route > /root/sebelum.txt
+   iptables -S >> /root/sebelum.txt
+   cat /proc/sys/net/ipv4/ip_forward >> /root/sebelum.txt
+   chmod +x /root/break_routing.sh
+   /root/break_routing.sh
+   ```
+2. Buktikan gejala:
+   ```bash
+   # Lilith
+   ping -c 2 10.93.4.83      # gagal
+   # Armisael
+   ping -c 2 10.93.4.81      # gateway, berhasil
+   ```
+   [screenshot: kedua hasil ping]
+3. Diagnosis di `Shigeru`:
+   ```bash
+   ip -br a
+   ip route
+   cat /proc/sys/net/ipv4/ip_forward
+   iptables -S
+   ip rule
+   cat /proc/sys/net/ipv4/conf/all/rp_filter
+   cat /proc/sys/net/ipv4/icmp_echo_ignore_all
+   ip route get 10.93.4.74
+   ```
+   [screenshot: output sebelum dan sesudah script]
 
-    ```bash
-    # Contoh kode perintah
-    ini kode
-    ```
-    
-    atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-    ```
-    isi script
-    ```
-dst terserah butuh berapa step
+   Penyebab (ada empat):
+
+   | Item | Kondisi acuan | Setelah script |
+   | :--- | :--- | :--- |
+   | `ip_forward` | `1` | `0` |
+   | default route | `via 10.93.4.157 dev eth0` | `via 10.93.4.162 dev eth1` |
+   | rute subnet Lilith | tidak ada (lewat default) | `blackhole 10.93.4.72/29` |
+   | `ip rule` | 3 baris bawaan | tambahan `90: from all iif eth2 lookup 100` |
+
+   `iptables`, `rp_filter`, dan `icmp_echo_ignore_all` tidak berubah.
+
+   Kenapa gejalanya begitu: ping Armisael ke gateway `10.93.4.81` berada dalam satu subnet, jadi tidak butuh forwarding atau rute. Paket antar-subnet butuh forwarding dan rute balik yang benar. Dengan `ip_forward = 0`, Shigeru tidak meneruskan paket. Default route ke Makoto membuat paket ke luar zona salah arah. Rute `blackhole` membuang balasan ke subnet Lilith. Rule `iif eth2 lookup 100` membuat traffic dari sisi Monolith memakai tabel rute yang bukan tabel utama.
+4. Perbaiki di `Shigeru`:
+   ```bash
+   echo 1 > /proc/sys/net/ipv4/ip_forward
+   ip route del blackhole 10.93.4.72/29
+   ip route replace default via 10.93.4.157 dev eth0
+   ip route replace 10.93.4.88/29 via 10.93.4.162 dev eth1
+   ip rule del priority 90
+   ip route flush table 100
+   ip route get 10.93.4.74     # via 10.93.4.157 dev eth0
+   ```
+5. Bukti setelah perbaikan:
+   ```bash
+   # Lilith
+   ping -c 2 10.93.4.83      # berhasil
+   # Armisael
+   ping -c 2 10.93.4.74      # berhasil
+   ```
+   [screenshot: ping berhasil dan `ip route`, `ip rule` setelah perbaikan]
 
 ---
 
 ## Soal 10
-> Penafsiran soal dan secara ringkas kita disuruh ngapain aja
+> Script `break_nat.sh` dijalankan di Misato dan di Gendou (file yang sama, tanpa dibaca isinya). Gejala: Unit-01, Unit-02, Unit-00 di Cage tidak bisa ping `8.8.8.8`, sementara Spy di Intel normal dan ping Cage ke Lilith normal.
 
-1. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-      ```bash
-      # Contoh kode perintah
-      ini kode
-      ```
-      
-      atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-      ```
-      isi script
-      ```
-2. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
+1. Catat kondisi sebelum di `Gendou` dan `Misato`, lalu jalankan script di keduanya:
+   ```bash
+   ip route > /root/sebelum.txt
+   iptables -S >> /root/sebelum.txt
+   iptables -t nat -S >> /root/sebelum.txt
+   cat /proc/sys/net/ipv4/ip_forward >> /root/sebelum.txt
+   chmod +x /root/break_nat.sh
+   /root/break_nat.sh
+   ```
+   Kondisi acuan: Gendou hanya punya satu rule NAT `-s 10.93.0.0/21 -o eth0 -j MASQUERADE`; Misato tidak punya rule NAT.
+2. Buktikan gejala: Unit-01 `ping -c 2 8.8.8.8` gagal, Unit-01 ke Lilith (`10.93.4.74`) berhasil, Spy `ping -c 2 8.8.8.8` berhasil.
+   [screenshot]
+3. Diagnosis di `Gendou` dan `Misato`: `ip route`, `iptables -S`, `iptables -t nat -S`.
 
-    ```bash
-    # Contoh kode perintah
-    ini kode
-    ```
-    
-    atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-    ```
-    isi script
-    ```
-dst terserah butuh berapa step
+   Penyebab (dua):
+
+   | Node | Kondisi acuan | Setelah script |
+   | :--- | :--- | :--- |
+   | Misato | tabel NAT kosong | `-A POSTROUTING -s 10.93.4.64/29 ! -d 10.93.0.0/16 -o eth0 -j SNAT --to-source 172.31.99.1` |
+   | Gendou | hanya `MASQUERADE` | tambahan `-A POSTROUTING -s 10.93.4.64/29 -o eth0 -j RETURN` di atas `MASQUERADE` |
+
+   Kenapa gejalanya begitu: Misato menerjemahkan sumber paket Cage menjadi `172.31.99.1` untuk tujuan di luar `10.93.0.0/16`. Di Gendou, sumber itu bukan bagian `10.93.0.0/21`, sehingga rule `FORWARD -s 10.93.0.0/21 -o eth0 -j ACCEPT` tidak cocok dan paket jatuh ke policy `FORWARD DROP`. Rule `RETURN` di Gendou juga akan melewati `MASQUERADE` untuk subnet Cage.
+
+   Kenapa Cage terdampak tapi Intel tidak: kedua rule hanya cocok untuk subnet Cage (`10.93.4.64/29`). Spy di Intel (subnet `10.93.4.100/30`, lewat Kaji) tidak terkena sehingga tetap di-`MASQUERADE` normal. Ping Cage ke Lilith normal karena tujuannya `10.93.0.0/16`, yang dikecualikan oleh `! -d` pada rule SNAT, jadi sumbernya tidak diubah.
+4. Perbaiki:
+   ```bash
+   # Misato
+   iptables -t nat -D POSTROUTING -s 10.93.4.64/29 ! -d 10.93.0.0/16 -o eth0 -j SNAT --to-source 172.31.99.1
+   # Gendou
+   iptables -t nat -D POSTROUTING -s 10.93.4.64/29 -o eth0 -j RETURN
+   iptables -t nat -S
+   ```
+5. Bukti setelah perbaikan:
+   ```bash
+   # Unit-01
+   ping -c 2 8.8.8.8
+   # Gendou
+   iptables -t nat -nvL POSTROUTING
+   ```
+   Hasil: ping berhasil, dan counter `MASQUERADE` naik (7 paket pada pengujian).
+   [screenshot]
+
+   Alamat sumber diterjemahkan di **Gendou**, satu-satunya router yang terhubung ke NAT1. Misato tidak boleh menerjemahkan alamat.
 
 ---
 
 ## Soal 11
-> Penafsiran soal dan secara ringkas kita disuruh ngapain aja
+> Casper dibuat "hantu": tidak ada perangkat lain yang boleh mem-ping Casper (termasuk yang satu switch), tetapi Casper tetap boleh mem-ping siapa saja dan TCP 5000 tetap hidup. Aturan dipasang di Casper sendiri, karena tetangga satu switch tidak lewat router. Yang dibuang hanya `echo-request` (ICMP tipe 8) yang masuk. Balasan ping Casper (`echo-reply`) tidak terkena rule.
 
-1. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-      ```bash
-      # Contoh kode perintah
-      ini kode
-      ```
-      
-      atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-      ```
-      isi script
-      ```
-2. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-
-    ```bash
-    # Contoh kode perintah
-    ini kode
-    ```
-    
-    atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-    ```
-    isi script
-    ```
-dst terserah butuh berapa step
+1. Buat script di `Magi-Casper`:
+   ```bash
+   cat > /root/casper-hantu.sh << 'EOF'
+   #!/bin/sh
+   iptables -C INPUT -p icmp --icmp-type echo-request -j DROP 2>/dev/null || \
+   iptables -I INPUT 1 -p icmp --icmp-type echo-request -j DROP
+   EOF
+   chmod +x /root/casper-hantu.sh
+   /root/casper-hantu.sh
+   iptables -S INPUT
+   ```
+2. Buktikan ping ke Casper gagal dan ping dari Casper berhasil:
+   ```bash
+   # Balthasar dan Lilith
+   ping -c 2 10.93.4.58      # gagal, 100% packet loss
+   # Casper
+   ping -c 2 10.93.4.59      # Balthasar, berhasil
+   ping -c 2 10.93.4.74      # Lilith, berhasil
+   ```
+3. Tunjukkan counter rule dan TCP 5000 tetap hidup:
+   ```bash
+   # Casper
+   iptables -nvL INPUT       # counter rule DROP naik
+   cat /root/nc5000.log      # pesan dari Lilith tetap masuk
+   ```
+   [screenshot: `iptables -nvL INPUT` (counter 10 paket pada pengujian), hasil ketiga ping, dan isi log]
 
 ---
 
 ## Soal 12
-> Penafsiran soal dan secara ringkas kita disuruh ngapain aja
+> Script `break_fw.sh` dijalankan di Casper tanpa dibaca isinya. Gejala: Casper tidak bisa ping `8.8.8.8`, tidak bisa `apt-get update`, dan Unit-00 tidak bisa menyambung ke TCP 5000. Ping ke Casper tetap ditolak (memang benar). Perbaikan tidak boleh membatalkan hardening: policy `INPUT` tetap `DROP` dan semua lalu lintas masuk yang tidak diizinkan tetap ditolak.
 
-1. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-      ```bash
-      # Contoh kode perintah
-      ini kode
-      ```
-      
-      atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-      ```
-      isi script
-      ```
-2. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
+1. Catat kondisi sebelum di `Magi-Casper`, lalu jalankan script:
+   ```bash
+   iptables-save > /root/casper.rules
+   iptables -S > /root/sebelum.txt
+   iptables -t nat -S >> /root/sebelum.txt
+   ip route >> /root/sebelum.txt
+   cat /etc/resolv.conf >> /root/sebelum.txt
+   chmod +x /root/break_fw.sh
+   /root/break_fw.sh
+   ```
+2. Buktikan gejala: di Casper `ping -c 2 8.8.8.8` dan `apt-get update` gagal (`Temporary failure resolving`), di Unit-00 `nc` ke `10.93.4.58 5000` gagal, ping ke Casper dari Lilith atau Balthasar tetap gagal.
+   [screenshot]
+3. Diagnosis di Casper: `iptables -S`, `iptables -t nat -S`, `ip route`, `cat /etc/resolv.conf`.
 
-    ```bash
-    # Contoh kode perintah
-    ini kode
-    ```
-    
-    atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-    ```
-    isi script
-    ```
-dst terserah butuh berapa step
+   Penyebab (empat):
+
+   | Item | Sebelum | Setelah script |
+   | :--- | :--- | :--- |
+   | policy `INPUT` | `ACCEPT` | `DROP` (hardening, dipertahankan) |
+   | rule ICMP | `-p icmp --icmp-type 8 -j DROP` | `-p icmp -j DROP` (semua ICMP, termasuk `echo-reply`) |
+   | `OUTPUT` | bersih | `-p udp --dport 53 -j DROP` |
+   | `ESTABLISHED,RELATED` dan ACCEPT TCP 5000 | tidak ada | tetap tidak ada |
+
+   Kenapa gejalanya begitu:
+   - `-p icmp -j DROP` membuang semua ICMP termasuk balasan ping, jadi ping Casper ke `8.8.8.8` terkirim tapi balasannya dibuang.
+   - `--dport 53 -j DROP` di `OUTPUT` memblokir DNS, jadi `deb.debian.org` tidak bisa di-resolve.
+   - Tanpa rule `ESTABLISHED,RELATED` di bawah `INPUT DROP`, balasan untuk koneksi yang dimulai Casper (DNS, HTTP apt) ikut dibuang walaupun DNS sudah dibuka.
+   - Tanpa ACCEPT TCP 5000, Unit-00 ditolak oleh policy `INPUT DROP` walaupun listener hidup.
+4. Buat script perbaikan di `Magi-Casper` (policy `INPUT` tetap `DROP`, tanpa `iptables -F`):
+   ```bash
+   cat > /root/casper-fix.sh << 'EOF'
+   #!/bin/sh
+   iptables -D INPUT -p icmp -j DROP 2>/dev/null
+   iptables -D OUTPUT -p udp --dport 53 -j DROP 2>/dev/null
+   iptables -C INPUT -p icmp --icmp-type echo-request -j DROP 2>/dev/null || \
+   iptables -I INPUT 2 -p icmp --icmp-type echo-request -j DROP
+   iptables -C INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
+   iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+   iptables -C INPUT -p tcp --dport 5000 -j ACCEPT 2>/dev/null || \
+   iptables -A INPUT -p tcp --dport 5000 -j ACCEPT
+   iptables -P INPUT DROP
+   EOF
+   chmod +x /root/casper-fix.sh
+   /root/casper-fix.sh
+   iptables -S
+   ```
+   Hasil `iptables -S` yang diharapkan:
+   ```text
+   -P INPUT DROP
+   -P FORWARD ACCEPT
+   -P OUTPUT ACCEPT
+   -A INPUT -i lo -j ACCEPT
+   -A INPUT -p icmp -m icmp --icmp-type 8 -j DROP
+   -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+   -A INPUT -p tcp -m tcp --dport 5000 -j ACCEPT
+   ```
+5. Pastikan listener TCP 5000 hidup (script rusak dapat menghentikannya), lalu simpan hasil:
+   ```bash
+   /root/casper.sh
+   netstat -tln | grep 5000
+   iptables-save > /root/casper-hardened.rules
+   ```
+6. Bukti setelah perbaikan:
+   ```bash
+   # Casper
+   ping -c 2 8.8.8.8
+   apt-get update            # "Get:" atau "Hit:", tanpa "Err:"
+   # Unit-00
+   echo "tes dari Unit-00" | nc -w 3 10.93.4.58 5000
+   # Casper
+   cat /root/nc5000.log      # pesan Unit-00 muncul
+   # Lilith atau Balthasar
+   ping -c 2 10.93.4.58      # tetap gagal
+   ```
+   [screenshot: semua hasil di atas dan `iptables -S`]
 
 ---
-
 ## Soal 13
 > Penafsiran soal dan secara ringkas kita disuruh ngapain aja
 
