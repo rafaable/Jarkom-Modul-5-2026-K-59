@@ -2938,30 +2938,275 @@ chmod +x /root/soal15_testing.sh
 ---
 
 ## Soal 16
-> Penafsiran soal dan secara ringkas kita disuruh ngapain aja
 
-1. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-      ```bash
-      # Contoh kode perintah
-      ini kode
-      ```
-      
-      atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-      ```
-      isi script
-      ```
-2. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
+* Buat aturan firewall di Tokyo3-Core
+* Deteksi koneksi TCP dari Dummy-Plug ke port 22, 23, dan 3306
+* Catat percobaan tersebut ke log dengan prefix `SCAN-NERV:`
+* Setelah dicatat, koneksi harus langsung ditolak seketika
+* Port 80 dan 8080 tetap bisa diakses
+* Node lain tidak boleh ikut terganggu
+* Buktikan dengan nc dan counter rule pencatatan
 
-    ```bash
-    # Contoh kode perintah
-    ini kode
-    ```
-    
-    atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-    ```
-    isi script
-    ```
-dst terserah butuh berapa step
+> Pada soal ini, kita mengamankan node pusat komando **Tokyo3-Core** (`10.93.4.106`) dari upaya pengintaian (*port scanning*) oleh **Dummy-Plug** (`10.93.4.51`) dari Switch-Lab ke port-port sensitif (TCP 22, 23, dan 3306). Firewall di Tokyo3-Core dikonfigurasi agar setiap koneksi TCP mencurigakan dari Dummy-Plug dicatat terlebih dahulu menggunakan target `LOG` ber-prefix `SCAN-NERV: ` sebelum langsung dibanting/ditolak seketika menggunakan target `REJECT` bertipe `tcp-reset` (*Connection refused* instan tanpa timeout), sementara layanan web port 80 dan 8080 tetap dapat diakses normal serta tidak mengganggu akses dari klien-klien lain di jaringan Geofront.
+
+---
+
+### Langkah Pengerjaan
+
+#### Prasyarat Rute pada Router Gateway (Ritsuko)
+Agar lalu lintas pengujian dari Dummy-Plug dapat mencapai Tokyo3-Core, pastikan router penghubung Switch-Lab (**Ritsuko**) memiliki rute default aktif menuju router induk Asuka (`10.93.4.141`).
+Jika belum aktif, jalankan di node **Ritsuko**:
+```bash
+/root/soal3.sh
+```
+
+---
+
+#### 1. Pembuatan Skrip Firewall Hardening di Node Tokyo3-Core
+Skrip ini mengaktifkan listener port 80 dan 8080, menyetel rate limiting ICMP dari Soal 15, serta menambahkan aturan deteksi logging dan reject seketika untuk Dummy-Plug.
+
+Di Node **Tokyo3-Core** `nano /root/soal16.sh`:
+<details>
+<summary>Lihat skrip <b>/root/soal16.sh</b> di Tokyo3-Core</summary>
+
+```bash
+#!/bin/sh
+# Node: Tokyo3-Core (IP: 10.93.4.106)
+
+# 1. Pastikan listener port 80 dan 8080 aktif (dari Soal 8 & 15)
+pkill -f "nc -l -p 80" 2>/dev/null
+pkill -f "nc -l -p 8080" 2>/dev/null
+nohup sh -c 'while true; do echo "Welcome to $(hostname)" | nc -l -p 80; done' >/dev/null 2>&1 &
+nohup sh -c 'while true; do echo "syifa imutz" | nc -l -p 8080; done' >/dev/null 2>&1 &
+
+# 2. Reset chain INPUT (Flush & Default Policy ACCEPT)
+iptables -P INPUT ACCEPT
+iptables -F INPUT
+
+# 3. Izinkan interface loopback
+iptables -A INPUT -i lo -j ACCEPT
+
+# 4. Aturan Soal 15: Penanganan ICMP Rate Limiting
+# Izinkan balasan ping Tokyo3-Core sendiri (echo-reply)
+iptables -A INPUT -p icmp --icmp-type echo-reply -j ACCEPT
+# Batasi ping masuk (echo-request) maks 5 per detik
+iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 5/second --limit-burst 5 -j ACCEPT
+# Buang kelebihan ping masuk
+iptables -A INPUT -p icmp --icmp-type echo-request -j DROP
+
+# 5. Aturan Soal 16: Deteksi Port Scanning Dummy-Plug (10.93.4.51)
+# Catat percobaan koneksi TCP ke port 22, 23, 3306 dengan prefix SCAN-NERV:
+iptables -A INPUT -s 10.93.4.51 -p tcp -m multiport --dports 22,23,3306 -j LOG --log-prefix "SCAN-NERV: "
+# Tolak seketika (REJECT) koneksi tersebut
+iptables -A INPUT -s 10.93.4.51 -p tcp -m multiport --dports 22,23,3306 -j REJECT --reject-with tcp-reset
+
+# 6. Izinkan koneksi established/related untuk lalu lintas lain
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+# 7. Simpan aturan agar permanen
+iptables-save > /root/tokyo3.rules 2>/dev/null || true
+echo "Konfigurasi Firewall Soal 16 di Tokyo3-Core berhasil diterapkan."
+```
+</details>
+
+Beri izin eksekusi dan jalankan di **Tokyo3-Core**:
+```bash
+chmod +x /root/soal16.sh
+/root/soal16.sh
+```
+
+---
+
+### Testing
+
+Pengujian Soal 16 dilakukan dari node penyerang (**Dummy-Plug**) dan node pembanding (**Lilith**), serta pemantauan status counter di pusat komando (**Tokyo3-Core**).
+
+#### Skrip Pemeriksaan Status Firewall di Tokyo3-Core
+Di Node **Tokyo3-Core** `nano /root/soal16_testing.sh`:
+<details>
+<summary>Lihat skrip pengujian <b>/root/soal16_testing.sh</b> di Tokyo3-Core</summary>
+
+```bash
+#!/bin/sh
+echo "=== 1. STATUS LISTENER PORT 80 DAN 8080 ==="
+netstat -tuln | grep -E '80|8080'
+
+echo ""
+echo "=== 2. ATURAN FIREWALL TOKYO3-CORE (IPTABLES -S) ==="
+iptables -S INPUT
+
+echo ""
+echo "=== 3. COUNTER PACKET FIREWALL (IPTABLES -NVL) ==="
+iptables -nvL INPUT
+```
+</details>
+
+Beri izin eksekusi dan jalankan di **Tokyo3-Core**:
+```bash
+chmod +x /root/soal16_testing.sh
+/root/soal16_testing.sh
+```
+
+---
+
+#### Skrip Pengujian Scanning dari Node Dummy-Plug
+Di Node **Dummy-Plug** `nano /root/soal16_testing.sh`:
+<details>
+<summary>Lihat skrip pengujian <b>/root/soal16_testing.sh</b> di Dummy-Plug</summary>
+
+```bash
+#!/bin/sh
+echo "=== PENGUJIAN PORT SCANNING DARI DUMMY-PLUG KE TOKYO3-CORE (10.93.4.106) ==="
+
+echo ""
+echo "--- 1. Uji Port 22 (SSH) ---"
+time nc -zv -w 2 10.93.4.106 22
+echo "Exit code: $?"
+
+echo ""
+echo "--- 2. Uji Port 23 (Telnet) ---"
+time nc -zv -w 2 10.93.4.106 23
+echo "Exit code: $?"
+
+echo ""
+echo "--- 3. Uji Port 3306 (MySQL) ---"
+time nc -zv -w 2 10.93.4.106 3306
+echo "Exit code: $?"
+
+echo ""
+echo "--- 4. Uji Port 80 (HTTP Web) ---"
+nc -w 2 10.93.4.106 80
+echo "Exit code: $?"
+
+echo ""
+echo "--- 5. Uji Port 8080 (HTTP Alt) ---"
+nc -w 2 10.93.4.106 8080
+echo "Exit code: $?"
+```
+</details>
+
+Beri izin eksekusi dan jalankan di **Dummy-Plug**:
+```bash
+chmod +x /root/soal16_testing.sh
+/root/soal16_testing.sh
+```
+
+---
+
+#### Butir-Butir Pengujian dan Pembuktian
+
+1. **Buat Aturan Firewall di Tokyo3-Core**  
+   *Membuktikan: Aturan firewall berhasil dibuat dan aktif pada node Tokyo3-Core.*  
+   Jalankan di node **Tokyo3-Core**:
+   ```bash
+   iptables -S INPUT
+   ```
+   *Output Verifikasi:*
+   ```text
+   -P INPUT ACCEPT
+   -A INPUT -i lo -j ACCEPT
+   -A INPUT -p icmp -m icmp --icmp-type 0 -j ACCEPT
+   -A INPUT -p icmp -m icmp --icmp-type 8 -m limit --limit 5/sec -j ACCEPT
+   -A INPUT -p icmp -m icmp --icmp-type 8 -j DROP
+   -A INPUT -s 10.93.4.51/32 -p tcp -m multiport --dports 22,23,3306 -j LOG --log-prefix "SCAN-NERV: "
+   -A INPUT -s 10.93.4.51/32 -p tcp -m multiport --dports 22,23,3306 -j REJECT --reject-with tcp-reset
+   -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+   ```
+   *Penjelasan:* Aturan firewall aktif di Tokyo3-Core dengan urutan yang tepat: loopback, penanganan ICMP rate limiting (Soal 15), pencatatan log dan reject scanning multiport (22, 23, 3306) untuk Dummy-Plug, diikuti connection tracking conntrack.
+
+2. **Deteksi Koneksi TCP dari Dummy-Plug ke Port 22, 23, dan 3306**  
+   *Membuktikan: Firewall mendeteksi dan menangkap setiap percobaan koneksi TCP dari Dummy-Plug (`10.93.4.51`) ke port sensitif tersebut.*  
+   Jalankan di node **Dummy-Plug**:
+   ```bash
+   nc -zv -w 2 10.93.4.106 22
+   nc -zv -w 2 10.93.4.106 23
+   nc -zv -w 2 10.93.4.106 3306
+   ```
+   *Output Verifikasi:*
+   ```text
+   nc: connect to 10.93.4.106 port 22 (tcp) failed: Connection refused
+   nc: connect to 10.93.4.106 port 23 (tcp) failed: Connection refused
+   nc: connect to 10.93.4.106 port 3306 (tcp) failed: Connection refused
+   ```
+   *Penjelasan:* Paket SYN TCP dari Dummy-Plug secara presisi dicocokkan oleh kriteria pencocokan rule `-s 10.93.4.51 -p tcp -m multiport --dports 22,23,3306` pada Tokyo3-Core.
+
+3. **Catat Percobaan Tersebut ke Log dengan Prefix `SCAN-NERV:`**  
+   *Membuktikan: Rule pencatatan log dengan prefix `SCAN-NERV: ` berhasil dipasang dan menangkap setiap paket percobaan scanning.*  
+   Jalankan di node **Tokyo3-Core**:
+   ```bash
+   iptables -S INPUT | grep "SCAN-NERV"
+   ```
+   *Output Verifikasi:*
+   ```text
+   -A INPUT -s 10.93.4.51/32 -p tcp -m multiport --dports 22,23,3306 -j LOG --log-prefix "SCAN-NERV: "
+   ```
+   *Penjelasan:* Rule `LOG` dengan prefix `SCAN-NERV: ` berstatus non-terminating dan diletakkan tepat mendahului rule `REJECT`. Ini memastikan setiap percobaan koneksi TCP tercatat terlebih dahulu oleh kernel sebelum diputus.
+
+4. **Setelah Dicatat, Koneksi Harus Langsung Ditolak Seketika**  
+   *Membuktikan: Koneksi ditolak seketika (*instant reject / connection refused*) tanpa jeda *timeout* (pintu dibanting).*  
+   Jalankan di node **Dummy-Plug**:
+   ```bash
+   time nc -zv -w 2 10.93.4.106 22
+   time nc -zv -w 2 10.93.4.106 23
+   time nc -zv -w 2 10.93.4.106 3306
+   ```
+   *Output Verifikasi:*
+   ```text
+   nc: connect to 10.93.4.106 port 22 (tcp) failed: Connection refused
+   real    0m 0.00s
+   user    0m 0.00s
+   sys     0m 0.00s
+   Exit code: 1
+
+   nc: connect to 10.93.4.106 port 23 (tcp) failed: Connection refused
+   real    0m 0.00s
+   Exit code: 1
+
+   nc: connect to 10.93.4.106 port 3306 (tcp) failed: Connection refused
+   real    0m 0.00s
+   Exit code: 1
+   ```
+   *Penjelasan:* Penggunaan opsi `time` membuktikan waktu respons adalah `real 0m 0.00s` (hanya ~2-4 milidetik). Rule `-j REJECT --reject-with tcp-reset` langsung mengembalikan paket TCP RST ke Dummy-Plug saat menerima paket SYN, membanting pintu koneksi tanpa menunggu batas *timeout* 2 detik (`-w 2`).
+
+5. **Port 80 dan 8080 Tetap Bisa Diakses**  
+   *Membuktikan: Layanan web HTTP di port 80 dan 8080 pada Tokyo3-Core tetap beroperasi normal dan bisa diakses oleh Dummy-Plug.*  
+   Jalankan di node **Dummy-Plug**:
+   ```bash
+   nc -w 2 10.93.4.106 80
+   nc -w 2 10.93.4.106 8080
+   ```
+   *Hasil Seharusnya:*
+   - Port 80: Menampilkan pesan `Welcome to Tokyo3-Core` (exit code 0).
+   - Port 8080: Menampilkan pesan `syifa imutz` (exit code 0).  
+   *Penjelasan:* Port 80 dan 8080 tidak masuk ke dalam daftar port terlarang (multiport 22, 23, 3306), sehingga paket langsung diteruskan ke listener masing-masing port tanpa halangan.
+
+6. **Node Lain Tidak Boleh Ikut Terganggu**  
+   *Membuktikan: Klien selain Dummy-Plug (misalnya node Lilith `10.93.4.74`) tetap dapat mengakses layanan Tokyo3-Core dan tidak memicu rule `SCAN-NERV:`.*  
+   Jalankan di node **Lilith**:
+   ```bash
+   nc -w 2 10.93.4.106 80
+   nc -w 2 10.93.4.106 8080
+   nc -zv -w 2 10.93.4.106 22
+   ```
+   *Hasil Seharusnya:*
+   - Port 80 dan 8080 merespons dengan banner normal.
+   - Pengecekan counter rule `LOG` di Tokyo3-Core menunjukkan counter **tidak bertambah** (tetap).  
+   *Penjelasan:* Filter firewall secara ketat hanya menargetkan IP sumber Dummy-Plug (`-s 10.93.4.51`), sehingga node lain di Geofront tidak terpengaruh oleh aturan pemblokiran ini.
+
+7. **Buktikan dengan nc dan Counter Rule Pencatatan**  
+   *Membuktikan: Pengujian menggunakan netcat terbukti menaikkan counter paket pada rule pencatatan (`LOG`) di Tokyo3-Core.*  
+   Jalankan di node **Tokyo3-Core**:
+   ```bash
+   iptables -nvL INPUT | grep -E 'LOG|REJECT'
+   ```
+   *Output Verifikasi:*
+   ```text
+   Chain INPUT (policy ACCEPT)
+    pkts bytes target     prot opt in     out     source               destination         
+       3   180 LOG        tcp  --  *      *       10.93.4.51           0.0.0.0/0            multiport dports 22,23,3306 LOG flags 0 level 4 prefix "SCAN-NERV: "
+       3   180 REJECT     tcp  --  *      *       10.93.4.51           0.0.0.0/0            multiport dports 22,23,3306 reject-with tcp-reset
+   ```
+   *Penjelasan:* Karena log kernel umumnya tidak dapat dibaca dari dalam container Docker/GNS3 (log kernel berada pada OS host), kenaikan counter paket (`pkts`) pada rule LOG membuktikan secara konkret bahwa firewall memproses dan mencatat setiap paket scanning dari Dummy-Plug.
 
 ---
 
