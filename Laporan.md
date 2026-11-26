@@ -2649,7 +2649,7 @@ Lakukan pengujian dari masing-masing node penguji:
    ping -c 2 -W 2 10.93.3.194
    nc -w 2 10.93.3.194 80
    ```
-   *Hasil Seharusnya:*
+   <br><img width="857" height="255" alt="image" src="https://github.com/user-attachments/assets/47d54268-008c-4afc-94b5-eff436fc4ab4" /><br>
    - Ping: **2 received, 0% packet loss**.
    - Netcat TCP 80: Menampilkan pesan `Welcome to Pen-Pen`.  
    *Penjelasan:* Alamat sumber Unit-01 (`10.93.4.66`) cocok dengan rule `-s 10.93.4.64/29 -m time` sehingga paket langsung diterima (`ACCEPT`).
@@ -2661,7 +2661,7 @@ Lakukan pengujian dari masing-masing node penguji:
    ping -c 2 -W 2 10.93.3.194
    nc -w 2 10.93.3.194 80
    ```
-   *Hasil Seharusnya:*
+   <br><img width="800" height="255" alt="image" src="https://github.com/user-attachments/assets/dff5002c-b256-46ff-bdb4-01095e321ca2" /><br>
    - Ping: **2 received, 0% packet loss**.
    - Netcat TCP 80: Menampilkan pesan `Welcome to Pen-Pen`.  
    *Penjelasan:* Alamat sumber Lilith (`10.93.4.74`) cocok dengan rule `-s 10.93.4.72/29 -m time` kategori Staf sehingga paket diterima (`ACCEPT`).
@@ -2673,7 +2673,7 @@ Lakukan pengujian dari masing-masing node penguji:
    ping -c 2 -W 2 10.93.3.194
    nc -w 2 10.93.3.194 80
    ```
-   *Hasil Seharusnya:*
+   <br><img width="856" height="173" alt="image" src="https://github.com/user-attachments/assets/c5b5ca92-b5b3-4d3b-a4c3-2d8e952b4ac6" /><br>
    - Ping: **2 packets transmitted, 0 received, 100% packet loss** (permintaan dibuang).
    - Netcat TCP 80: Menggantung sampai jeda 2 detik selesai (*timeout*) tanpa menerima balasan.  
    *Penjelasan:* Aturan pemblokiran Dummy System (`-s 10.93.4.100/30 -j DROP`) diletakkan di baris paling atas mendahului aturan waktu, memastikan paket dari Spy langsung dibuang tanpa memeriksa jadwal.
@@ -2696,6 +2696,7 @@ Lakukan pengujian dari masing-masing node penguji:
    ```bash
    ping -c 2 -W 2 10.93.3.194
    ```
+   <br><img width="857" height="138" alt="image" src="https://github.com/user-attachments/assets/d37fde50-cc48-49d0-8346-6b4d317fb557" /><br>
    *Hasil Seharusnya:* **2 packets transmitted, 0 received, 100% packet loss**.  
    *Penjelasan:* Paket tidak cocok dengan rule `-m time` Pilot, sehingga diteruskan ke baris berikutnya yaitu rule `-s 10.93.4.64/29 -j DROP` yang membuang paket.
 
@@ -2705,6 +2706,7 @@ Lakukan pengujian dari masing-masing node penguji:
    ```bash
    ping -c 2 -W 2 10.93.3.194
    ```
+   <br><img width="801" height="133" alt="image" src="https://github.com/user-attachments/assets/b5313981-1c95-46a8-897f-4edeaf65c446" /><br>
    *Hasil Seharusnya:* **2 packets transmitted, 0 received, 100% packet loss**.  
    *Penjelasan:* Paket Lilith melewati batas waktu Staf sehingga dieksekusi oleh rule `-s 10.93.4.72/29 -j DROP`.
 
@@ -2714,6 +2716,7 @@ Lakukan pengujian dari masing-masing node penguji:
    ```bash
    ping -c 2 -W 2 10.93.3.194
    ```
+   <br><img width="799" height="127" alt="image" src="https://github.com/user-attachments/assets/2ea76c44-9ee6-4d4e-8a12-7f572a515bc9" /><br>
    *Hasil Seharusnya:* **2 packets transmitted, 0 received, 100% packet loss**.  
    *Penjelasan:* Terduga Dummy System memiliki status *unconditional drop* (selalu dibuang kapan pun).
 
@@ -2724,6 +2727,7 @@ Lakukan pengujian dari masing-masing node penguji:
    ping -c 2 -W 2 10.93.3.194
    nc -w 2 10.93.3.194 80
    ```
+   <br><img width="740" height="240" alt="image" src="https://github.com/user-attachments/assets/61acd2c5-2b9c-4b58-9650-bc0f4a4b4f4a" /><br>
    *Hasil Seharusnya:*
    - Ping: **2 received, 0% packet loss**.
    - Netcat TCP 80: Menampilkan pesan `Welcome to Pen-Pen`.  
