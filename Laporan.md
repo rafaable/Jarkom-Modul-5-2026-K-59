@@ -1,4 +1,4 @@
-# Laporan Resmi Praktikum Komdat-Jarkom Modul 1
+<img width="1523" height="204" alt="image" src="https://github.com/user-attachments/assets/6c45c1e8-a53a-40e1-a03f-0108276bb87d" /># Laporan Resmi Praktikum Komdat-Jarkom Modul 1
 
 > **Kelompok K-59**
 > * Salsabila Rafa Syafira (5027251059)
@@ -2840,6 +2840,7 @@ Beri izin eksekusi dan jalankan di **Tokyo3-Core**:
 chmod +x /root/soal15_testing.sh
 /root/soal15_testing.sh
 ```
+<br><img width="1532" height="534" alt="image" src="https://github.com/user-attachments/assets/b54d85cf-7cb7-42ca-8e46-fcac5cb637df" /><br>
 
 ---
 
@@ -2861,24 +2862,25 @@ chmod +x /root/soal15_testing.sh
        0     0 DROP       icmp --  *      *       0.0.0.0/0            0.0.0.0/0            icmptype 8
        0     0 ACCEPT     all  --  *      *       0.0.0.0/0            0.0.0.0/0            ctstate RELATED,ESTABLISHED
    ```
+   <br><img width="1523" height="204" alt="image" src="https://github.com/user-attachments/assets/8360b435-cb19-4bbb-a99d-8ec348c48e8a" /><br>
    *Penjelasan:* Terlihat rule limit (maks 5/detik burst 5) dan rule drop berada pada posisi sebelum conntrack, siap memfilter ping masuk.
-
-2. **Pengujian Banjir Ping Rapat dari Node Lilith (`ping -i 0.1 -c 50`)**  
+   
+3. **Pengujian Banjir Ping Rapat dari Node Lilith (`ping -i 0.1 -c 50`)**  
    *Membuktikan: Ping yang dikirim melebihi batas laju (10 paket per detik selama 5 detik) sebagian dibuang oleh Tokyo3-Core.*  
    Jalankan di node **Lilith**:
    ```bash
    ping -i 0.1 -c 50 10.93.4.106
    ```
-   *Hasil Seharusnya:*
-   - Dari 50 paket yang dikirimkan dengan jeda 0.1 detik, sebagian paket hilang (*packet loss* berkisar antara 35% s.d. 50%).
-   - Contoh output:
+   <br><img width="927" height="555" alt="image" src="https://github.com/user-attachments/assets/746971c5-4fc3-4e37-9b86-471a35d2f59e" /><br>
+
      ```text
      50 packets transmitted, 30 received, 40% packet loss, time 5079ms
      rtt min/avg/max/mdev = 0.533/0.935/1.352/0.214 ms
      ```
-   *Penjelasan:* Karena Lilith mengirimkan 10 ping per detik sedangkan Tokyo3-Core dibatasi maksimal 5 ping per detik, kelebihan paket (~20 paket) jatuh ke rule DROP dan dibuang.
+   - Dari 50 paket yang dikirimkan dengan jeda 0.1 detik, sebagian paket hilang (*packet loss* berkisar antara 35% s.d. 50%).
+   - *Penjelasan:* Karena Lilith mengirimkan 10 ping per detik sedangkan Tokyo3-Core dibatasi maksimal 5 ping per detik, kelebihan paket (~20 paket) jatuh ke rule DROP dan dibuang.
 
-3. **Verifikasi Kenaikan Counter Rule Pembuangan (`DROP`) pada Tokyo3-Core**  
+4. **Verifikasi Kenaikan Counter Rule Pembuangan (`DROP`) pada Tokyo3-Core**  
    *Membuktikan: Paket yang hilang pada pengujian butir 2 benar-benar dibuang oleh aturan firewall DROP, bukan karena masalah kabel atau rute.*  
    Jalankan di node **Tokyo3-Core**:
    ```bash
@@ -2894,40 +2896,41 @@ chmod +x /root/soal15_testing.sh
       20  1680 DROP       icmp --  *      *       0.0.0.0/0            0.0.0.0/0            icmptype 8
        0     0 ACCEPT     all  --  *      *       0.0.0.0/0            0.0.0.0/0            ctstate RELATED,ESTABLISHED
    ```
+   <br><img width="1529" height="193" alt="image" src="https://github.com/user-attachments/assets/11b2f4a9-4c48-4dfd-9db4-c0f2a4bddf80" /><br>
    *Penjelasan:* Counter pada rule `ACCEPT` bertambah tepat 30 paket, dan counter pada rule `DROP` bertambah tepat 20 paket (total 50 paket). Ini membuktikan pembuangan paket terjadi secara aktif di firewall Tokyo3-Core.
 
-4. **Pengujian Ping Normal dengan Jeda 3 Detik (`ping -i 3 -c 5`)**  
+5. **Pengujian Ping Normal dengan Jeda 3 Detik (`ping -i 3 -c 5`)**  
    *Membuktikan: Ping normal yang berada di bawah batas laju berhasil 100% tanpa gangguan.*  
    Jalankan di node **Lilith**:
    ```bash
    ping -i 3 -c 5 10.93.4.106
    ```
-   *Hasil Seharusnya:*
+   <br><img width="841" height="246" alt="image" src="https://github.com/user-attachments/assets/25e94c36-b3d5-408a-b485-7b53031a9260" /><br>
    ```text
    5 packets transmitted, 5 received, 0% packet loss, time 12041ms
    ```
    *Penjelasan:* Jeda 3 detik antar paket jauh di bawah kapasitas token bucket (1 token terisi kembali setiap 200 milidetik), sehingga seluruh 5 paket ping diterima dengan status **0% packet loss**.
 
-5. **Pengujian Ping Keluar dari Tokyo3-Core Sendiri**  
+6. **Pengujian Ping Keluar dari Tokyo3-Core Sendiri**  
    *Membuktikan: Aturan firewall pada Tokyo3-Core tidak membatasi koneksi ping yang dikirimkan oleh Tokyo3-Core sendiri ke node lain.*  
    Jalankan di node **Tokyo3-Core**:
    ```bash
    ping -c 3 10.93.4.74
    ```
-   *Hasil Seharusnya:*
+   <br><img width="791" height="228" alt="image" src="https://github.com/user-attachments/assets/83f2545d-3d25-4280-8249-c7aaa44019b1" /><br>
    ```text
    3 packets transmitted, 3 received, 0% packet loss, time 2002ms
    ```
    *Penjelasan:* Paket permintaan keluar (`echo-request`) melewati chain `OUTPUT` tanpa batasan, dan balasan masuk (`echo-reply` tipe 0) diterima langsung oleh rule `-p icmp --icmp-type echo-reply -j ACCEPT` sehingga tidak terkena aturan rate limit.
 
-6. **Pengujian Akses Layanan Web Port 80 dan 8080 dari Lilith**  
+7. **Pengujian Akses Layanan Web Port 80 dan 8080 dari Lilith**  
    *Membuktikan: Layanan TCP lain pada Tokyo3-Core tidak terganggu oleh filter ICMP.*  
    Jalankan di node **Lilith**:
    ```bash
    nc -w 2 10.93.4.106 80
    nc -w 2 10.93.4.106 8080
    ```
-   *Hasil Seharusnya:*
+   <br><img width="522" height="99" alt="image" src="https://github.com/user-attachments/assets/056294f2-1b67-45e5-825e-f1258e039aa1" /><br>
    - Port 80: Menampilkan pesan `Welcome to Tokyo3-Core`.
    - Port 8080: Menampilkan pesan `syifa imutz`.  
    *Penjelasan:* Filter firewall dispesifikasikan secara ketat hanya untuk protokol `icmp` (`-p icmp`), sehingga paket protokol `tcp` langsung diteruskan ke port listener masing-masing tanpa hambatan.
