@@ -1944,10 +1944,12 @@ iface eth0 inet static
     netmask 255.255.254.0
     gateway 10.93.0.1
 ```
+</details>
 #### 3.Pengujian Persistensi Konfigurasi pada Unit-01
 <img width="1112" height="826" alt="image" src="https://github.com/user-attachments/assets/2942ff9b-8194-411e-8b78-5c00a9411460" />
 
 ---
+
 ## Soal 7
 > Memasang `iptables` dan `netcat-traditional` di tiga node MAGI (Casper, Balthasar, Melchior) lewat script di `/root`, lalu menyalakan listener TCP sesuai glosarium (Casper 5000, Balthasar 5000 dan 5001, Melchior 5000). Node MAGI memakai image `debinet` karena `netcat-traditional` adalah paket Debian. Pengujian dilakukan dari Lilith.
 
