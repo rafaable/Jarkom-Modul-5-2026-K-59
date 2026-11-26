@@ -2280,33 +2280,175 @@ iface eth0 inet static
    ping -c 2 10.93.4.58      # tetap gagal
    ```
   
-
 ---
 ## Soal 13
-> Penafsiran soal dan secara ringkas kita disuruh ngapain aja
 
-1. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-      ```bash
-      # Contoh kode perintah
-      ini kode
-      ```
-      
-      atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-      ```
-      isi script
-      ```
-2. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
+* Melindungi port TCP 5000 dan 5001 pada node Magi-Balthasar
+* Hanya mengizinkan koneksi ke TCP 5000 dan 5001 dari Magi-Casper dan seluruh Pilot (Unit-01, Unit-02, Unit-00, Sachiel)
+* Menolak seketika (*instant reject* dengan TCP Reset) koneksi ke port 5000 dan 5001 dari node lain, termasuk tetangga satu switch
+* Memastikan seluruh lalu lintas lain (di luar TCP 5000 dan 5001) tidak terganggu
+* Memastikan Magi-Balthasar tetap dapat melakukan ping ke 8.8.8.8 dan menerima balasannya
+* Membuktikan koneksi dengan nc ke port 5000 dan 5001: Unit-01 berhasil, sedangkan Lilith dan Melchior ditolak seketika
 
-    ```bash
-    # Contoh kode perintah
-    ini kode
-    ```
-    
-    atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-    ```
-    isi script
-    ```
-dst terserah butuh berapa step
+> Pada soal ini, kita mengamankan layanan brankas data pada server **Magi-Balthasar** yang berjalan pada port TCP 5000 dan 5001. Akses ke kedua port tersebut dibatasi secara ketat hanya untuk **Magi-Casper** (`10.93.4.58`) dan seluruh **Pilot** (kelompok Pilot di Glosarium: **Unit-01** `10.93.4.66`, **Unit-02** `10.93.4.67`, **Unit-00** `10.93.4.68` di Switch-Cage `10.93.4.64/29`, serta **Sachiel** `10.93.3.130`). Seluruh node lain—termasuk tetangga satu segmen switch seperti **Magi-Melchior** (`10.93.4.60`)—harus **langsung ditolak seketika** menggunakan mekanisme `REJECT --reject-with tcp-reset` agar tidak menggantung (*timeout*). Selain itu, aturan firewall tidak boleh mengganggu lalu lintas lain sehingga Balthasar tetap bisa melakukan ping keluar ke internet (`8.8.8.8`) dan menerima balasannya. Konfigurasi firewall filtering Soal 13 ini dijalankan langsung via skrip shell di direktori `/root/` node **Magi-Balthasar**.
+
+---
+
+### Langkah Pengerjaan
+
+#### 1. Pembuatan Skrip Firewall dan Listener di Node Magi-Balthasar
+
+Aturan firewall dipasang pada chain `INPUT` di **Magi-Balthasar** karena penyaringan harus dapat memfilter paket dari node satu switch (layer-2). Agar koneksi ditolak secara instan tanpa membuat klien menggantung, digunakan target `REJECT --reject-with tcp-reset`.
+
+Di Node **Magi-Balthasar** `nano /root/soal13.sh`:
+<details>
+<summary>Lihat skrip <b>/root/soal13.sh</b> di Magi-Balthasar</summary>
+
+```bash
+#!/bin/sh
+# Node: Magi-Balthasar (IP: 10.93.4.59)
+
+# 1. Pastikan tools iptables dan netcat tersedia
+command -v iptables >/dev/null 2>&1 || { apt-get update -qq && apt-get install -y -qq iptables; }
+command -v nc >/dev/null 2>&1 || { apt-get update -qq && apt-get install -y -qq netcat-traditional; }
+
+# 2. Aktifkan listener TCP 5000 dan 5001 di background jika belum aktif
+if ! netstat -tuln 2>/dev/null | grep -q ':5000 '; then
+    nohup nc.traditional -lvp 5000 -k >/dev/null 2>&1 &
+fi
+if ! netstat -tuln 2>/dev/null | grep -q ':5001 '; then
+    nohup nc.traditional -lvp 5001 -k >/dev/null 2>&1 &
+fi
+
+# 3. Reset chain INPUT (hanya flush aturan tanpa mengubah policy dasar)
+iptables -P INPUT ACCEPT
+iptables -F INPUT
+
+# 4. Izinkan interface loopback
+iptables -A INPUT -i lo -j ACCEPT
+
+# 5. Izinkan koneksi balasan yang sudah berjalan (Stateful Inspection)
+# Memastikan balasan ping dari 8.8.8.8 dan koneksi keluar Balthasar tetap diterima
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+# 6. WHITELIST: Izinkan Magi-Casper ke TCP 5000 dan 5001
+iptables -A INPUT -p tcp -s 10.93.4.58 -m multiport --dports 5000,5001 -j ACCEPT
+
+# 7. WHITELIST: Izinkan Seluruh Pilot ke TCP 5000 dan 5001
+# Subnet Switch-Cage (Unit-01: .66, Unit-02: .67, Unit-00: .68)
+iptables -A INPUT -p tcp -s 10.93.4.64/29 -m multiport --dports 5000,5001 -j ACCEPT
+# Sachiel (Pilot di Switch-Bunker)
+iptables -A INPUT -p tcp -s 10.93.3.130 -m multiport --dports 5000,5001 -j ACCEPT
+
+# 8. BLACKLIST: Tolak SEKETIKA (TCP Reset) semua koneksi lain ke port 5000 dan 5001
+# Menggunakan TCP Reset agar koneksi langsung refused seketika, bukan menggantung/timeout
+iptables -A INPUT -p tcp -m multiport --dports 5000,5001 -j REJECT --reject-with tcp-reset
+
+# 9. Simpan aturan agar permanen
+iptables-save > /root/balthasar.rules
+echo "Konfigurasi Firewall Soal 13 di Magi-Balthasar berhasil diterapkan."
+```
+</details>
+
+Beri izin eksekusi dan jalankan skrip di **Magi-Balthasar**:
+```bash
+chmod +x /root/soal13.sh
+/root/soal13.sh
+```
+
+---
+
+### Testing
+
+Pengujian Soal 13 disusun untuk membuktikan secara spesifik setiap butir persyaratan yang diminta:
+
+1. **Melindungi Port TCP 5000 dan 5001 pada Node Magi-Balthasar**  
+   *Membuktikan: Port 5000 dan 5001 aktif mendengarkan koneksi dan diawasi oleh aturan firewall khusus.*  
+   Jalankan di node **Magi-Balthasar**:
+   ```bash
+   # Cek service listener aktif
+   netstat -tuln | grep -E '5000|5001'
+   # Cek aturan firewall yang melindungi kedua port
+   iptables -S INPUT | grep -E '5000|5001'
+   ```
+   *Output yang diharapkan:*
+   ```text
+   tcp        0      0 0.0.0.0:5000            0.0.0.0:*               LISTEN
+   tcp        0      0 0.0.0.0:5001            0.0.0.0:*               LISTEN
+   -A INPUT -s 10.93.4.58/32 -p tcp -m multiport --dports 5000,5001 -j ACCEPT
+   -A INPUT -s 10.93.4.64/29 -p tcp -m multiport --dports 5000,5001 -j ACCEPT
+   -A INPUT -s 10.93.3.130/32 -p tcp -m multiport --dports 5000,5001 -j ACCEPT
+   -A INPUT -p tcp -m multiport --dports 5000,5001 -j REJECT --reject-with tcp-reset
+   ```
+
+2. **Hanya Mengizinkan Koneksi ke TCP 5000 dan 5001 dari Magi-Casper dan Seluruh Pilot**  
+   *Membuktikan: Casper dan kelompok Pilot (Unit-01, Unit-02, Unit-00, Sachiel) berhasil terhubung ke port 5000 dan 5001.*  
+   * Dari node **Unit-01** (Pilot):
+     ```bash
+     nc -zv -w 2 10.93.4.59 5000
+     nc -zv -w 2 10.93.4.59 5001
+     ```
+     *Hasil:* `(10.93.4.59:5000) open` dan `(10.93.4.59:5001) open`.
+   * Dari node **Magi-Casper** (`10.93.4.58`):
+     ```bash
+     nc -zv -w 2 10.93.4.59 5000
+     nc -zv -w 2 10.93.4.59 5001
+     ```
+     *Hasil:* `(10.93.4.59:5000) open` dan `(10.93.4.59:5001) open`.
+   * Dari node **Sachiel** (Pilot di Bunker `10.93.3.130`):
+     ```bash
+     nc -zv -w 2 10.93.4.59 5000
+     nc -zv -w 2 10.93.4.59 5001
+     ```
+     *Hasil:* `(10.93.4.59:5000) open` dan `(10.93.4.59:5001) open`.
+
+3. **Menolak Seketika (Instant Reject dengan TCP Reset) Koneksi ke Port 5000 dan 5001 dari Node Lain, Termasuk Tetangga Satu Switch**  
+   *Membuktikan: Node di luar whitelist langsung menerima respons penolakan TCP RST (Connection refused) dalam hitungan milidetik tanpa menggantung sampai timeout.*  
+   * Dari node **Magi-Melchior** (tetangga satu switch di Switch-Terminal):
+     ```bash
+     nc -zv -w 2 10.93.4.59 5000
+     nc -zv -w 2 10.93.4.59 5001
+     ```
+     *Hasil:* Langsung keluar seketika dengan pesan `failed: Connection refused` tanpa menunggu jeda timeout.
+   * Dari node **Lilith** (staf Geofront / luar switch):
+     ```bash
+     nc -zv -w 2 10.93.4.59 5000
+     nc -zv -w 2 10.93.4.59 5001
+     ```
+     *Hasil:* Langsung keluar seketika dengan pesan `failed: Connection refused`.
+
+4. **Memastikan Seluruh Lalu Lintas Lain (di Luar TCP 5000 dan 5001) Tidak Terganggu**  
+   *Membuktikan: Node yang ditolak di port 5000/5001 tetap bisa melakukan komunikasi normal (seperti ping ICMP) ke Balthasar.*  
+   * Dari node **Magi-Melchior** (tetangga satu switch):
+     ```bash
+     ping -c 2 10.93.4.59
+     ```
+     *Hasil:* **2 received, 0% packet loss** (ping lancar membuktikan hanya port 5000 & 5001 yang diblokir).
+   * Dari node **Lilith**:
+     ```bash
+     ping -c 2 10.93.4.59
+     ```
+     *Hasil:* **2 received, 0% packet loss**.
+
+5. **Memastikan Magi-Balthasar Tetap Dapat Melakukan Ping ke 8.8.8.8 dan Menerima Balasannya**  
+   *Membuktikan: Koneksi keluar dan balasan paket internet Balthasar tetap diizinkan oleh aturan stateful inspection.*  
+   Jalankan di node **Magi-Balthasar**:
+   ```bash
+   ping -c 2 8.8.8.8
+   ```
+   *Hasil:* **2 packets transmitted, 2 received, 0% packet loss**.
+
+6. **Membuktikan Koneksi dengan nc ke Port 5000 dan 5001: Unit-01 Berhasil, Sedangkan Lilith dan Melchior Ditolak Seketika**  
+   *Ringkasan pembuktian komparatif dan verifikasi counter iptables:*  
+   * Uji komparasi:
+     * **Unit-01:** `nc -zv -w 2 10.93.4.59 5000` -> **open**
+     * **Magi-Melchior:** `nc -zv -w 2 10.93.4.59 5000` -> **Connection refused**
+     * **Lilith:** `nc -zv -w 2 10.93.4.59 5000` -> **Connection refused**
+   * Pemeriksaan counter paket pada aturan firewall di **Magi-Balthasar**:
+     ```bash
+     iptables -nvL INPUT
+     ```
+     *Hasil:* Counter pada rule ACCEPT untuk subnet Cage (`10.93.4.64/29`) bertambah, dan counter pada rule REJECT untuk paket dari Melchior/Lilith bertambah.
 
 ---
 
