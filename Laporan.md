@@ -3394,6 +3394,7 @@ chmod +x /root/soal17_testing.sh
    ```bash
    iptables -t nat -S PREROUTING
    ```
+   <br><img width="1121" height="76" alt="image" src="https://github.com/user-attachments/assets/cecde380-61ef-41bf-b3c0-b29a1444dbdd" /><br>
    *Output Verifikasi:*
    ```text
    -P PREROUTING ACCEPT
@@ -3407,6 +3408,7 @@ chmod +x /root/soal17_testing.sh
    ```bash
    iptables -t nat -nvL PREROUTING
    ```
+   <br><img width="1303" height="98" alt="image" src="https://github.com/user-attachments/assets/7e88d35f-59d4-4b54-858e-c5a1fd44ca4c" /><br>
    *Output Verifikasi:*
    ```text
    Chain PREROUTING (policy ACCEPT 4 packets, 336 bytes)
@@ -3422,6 +3424,7 @@ chmod +x /root/soal17_testing.sh
    echo "Halo Zeruel dari Casper" | nc -w 2 10.93.4.82 9000
    echo "Exit code: $?"
    ```
+   <br><img width="954" height="65" alt="image" src="https://github.com/user-attachments/assets/fd9e5eeb-aefb-4064-80e1-a6e3d345c293" /><br>
    *Output Verifikasi:*
    ```text
    Exit code: 0
@@ -3434,6 +3437,7 @@ chmod +x /root/soal17_testing.sh
    ```bash
    conntrack -L | grep 9000
    ```
+   <br><img width="1708" height="97" alt="image" src="https://github.com/user-attachments/assets/c1b2953d-ff67-4c5e-b9d1-671782c4209c" /><br>
    *Output Verifikasi:*
    ```text
    tcp      6 103 TIME_WAIT src=10.93.4.58 dst=10.93.4.82 sport=48014 dport=9000 src=10.93.3.194 dst=10.93.4.58 sport=9000 dport=48014 [ASSURED] mark=0 use=1
@@ -3446,6 +3450,7 @@ chmod +x /root/soal17_testing.sh
    ```bash
    ping -c 2 10.93.4.82
    ```
+   <br><img width="777" height="179" alt="image" src="https://github.com/user-attachments/assets/760426a1-78d0-4953-8087-53c37cf3b514" /><br>
    *Output Verifikasi:*
    ```text
    PING 10.93.4.82 (10.93.4.82) 56(84) bytes of data.
@@ -3464,6 +3469,8 @@ chmod +x /root/soal17_testing.sh
    ```bash
    netstat -tuln | grep 9000
    ```
+   <br><img width="1015" height="51" alt="image" src="https://github.com/user-attachments/assets/c337b672-63c0-4473-9848-1979db90a52a" /><br>
+   <br><img width="971" height="51" alt="image" src="https://github.com/user-attachments/assets/44dd357a-6cd8-491b-a05e-f82963fcb86c" /><br>
    *Output Verifikasi di Kedua Node:*
    ```text
    tcp        0      0 0.0.0.0:9000            0.0.0.0:*               LISTEN
@@ -3476,6 +3483,7 @@ chmod +x /root/soal17_testing.sh
    ```bash
    cat /tmp/penpen.txt
    ```
+   <br><img width="950" height="105" alt="image" src="https://github.com/user-attachments/assets/2435cd74-5e8f-42c6-b3b5-a978270318c0" /><br>
    *Output:*
    ```text
    Halo Zeruel dari Casper
@@ -3484,6 +3492,7 @@ chmod +x /root/soal17_testing.sh
    ```bash
    cat /tmp/zeruel.txt
    ```
+   <br><img width="959" height="100" alt="image" src="https://github.com/user-attachments/assets/e71f8731-1a44-41a4-9075-d1ebcb070dd4" /><br>
    *Output:*
    ```text
    (Kosong / tidak ada pesan)
@@ -3491,11 +3500,16 @@ chmod +x /root/soal17_testing.sh
    *Penjelasan:* Pesan terbukti masuk ke `/tmp/penpen.txt` pada Pen-Pen, sedangkan file `/tmp/zeruel.txt` di Zeruel tetap kosong. Ini menjadi bukti mutlak bahwa pengalihan paket oleh router Fuyutsuki bekerja dengan sempurna.
 
 8. **Tampilkan Tabel Conntrack di Fuyutsuki**  
-   *Membuktikan: Bukti translasi alamat stateful conntrack tercatat di router Fuyutsuki.*  
+   *Membuktikan: Bukti translasi alamat stateful conntrack tercatat di router Fuyutsuki.*
+   Kirim teks ke **Magi-Casper**
+   ```bash
+   echo "Halo lagi dari Casper" | nc -w 2 10.93.4.82 9000
+   ```
    Jalankan di node **Fuyutsuki**:
    ```bash
    conntrack -L | grep 9000
    ```
+   <br><img width="1701" height="96" alt="image" src="https://github.com/user-attachments/assets/4bb032a7-2407-4c5e-927b-d5d87ef2768e" /><br>
    *Output Verifikasi:*
    ```text
    tcp      6 103 TIME_WAIT src=10.93.4.58 dst=10.93.4.82 sport=48014 dport=9000 src=10.93.3.194 dst=10.93.4.58 sport=9000 dport=48014 [ASSURED] mark=0 use=1
