@@ -1,4 +1,5 @@
-<img width="1523" height="204" alt="image" src="https://github.com/user-attachments/assets/6c45c1e8-a53a-40e1-a03f-0108276bb87d" /# Laporan Resmi Praktikum Komdat-Jarkom Modul 1
+
+# Laporan Resmi Praktikum Komdat-Jarkom Modul 1
 
 > **Kelompok K-59**
 > * Salsabila Rafa Syafira (5027251059)
