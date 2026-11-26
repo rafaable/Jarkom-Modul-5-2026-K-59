@@ -2377,6 +2377,7 @@ Pengujian Soal 13 disusun untuk membuktikan secara spesifik setiap butir persyar
    -A INPUT -s 10.93.3.130/32 -p tcp -m multiport --dports 5000,5001 -j ACCEPT
    -A INPUT -p tcp -m multiport --dports 5000,5001 -j REJECT --reject-with tcp-reset
    ```
+   <br><img width="1088" height="241" alt="image" src="https://github.com/user-attachments/assets/98cb45f7-dbbe-4bba-8f5f-5708363cd19b" /><br> 
 
 2. **Hanya Mengizinkan Koneksi ke TCP 5000 dan 5001 dari Magi-Casper dan Seluruh Pilot**  
    *Membuktikan: Casper dan kelompok Pilot (Unit-01, Unit-02, Unit-00, Sachiel) berhasil terhubung ke port 5000 dan 5001.*  
@@ -2385,18 +2386,21 @@ Pengujian Soal 13 disusun untuk membuktikan secara spesifik setiap butir persyar
      nc -zv -w 2 10.93.4.59 5000
      nc -zv -w 2 10.93.4.59 5001
      ```
-     *Hasil:* `(10.93.4.59:5000) open` dan `(10.93.4.59:5001) open`.
+     <br><img width="697" height="111" alt="image" src="https://github.com/user-attachments/assets/e9ec7cf3-e783-4cc1-96c0-da088569d48f" /><br>
+     *Hasil:* `(10.93.4.59:5000) open` dan `(10.93.4.59:5001) open`  
    * Dari node **Magi-Casper** (`10.93.4.58`):
      ```bash
      nc -zv -w 2 10.93.4.59 5000
      nc -zv -w 2 10.93.4.59 5001
      ```
+     <br><img width="702" height="106" alt="image" src="https://github.com/user-attachments/assets/124d0e81-ead4-468a-bb17-8b33a29935cd" /><br>
      *Hasil:* `(10.93.4.59:5000) open` dan `(10.93.4.59:5001) open`.
    * Dari node **Sachiel** (Pilot di Bunker `10.93.3.130`):
      ```bash
      nc -zv -w 2 10.93.4.59 5000
      nc -zv -w 2 10.93.4.59 5001
      ```
+     <br><img width="706" height="117" alt="image" src="https://github.com/user-attachments/assets/e9cb6278-2c08-457f-a538-be8060474b65" /><br>
      *Hasil:* `(10.93.4.59:5000) open` dan `(10.93.4.59:5001) open`.
 
 3. **Menolak Seketika (Instant Reject dengan TCP Reset) Koneksi ke Port 5000 dan 5001 dari Node Lain, Termasuk Tetangga Satu Switch**  
@@ -2406,12 +2410,14 @@ Pengujian Soal 13 disusun untuk membuktikan secara spesifik setiap butir persyar
      nc -zv -w 2 10.93.4.59 5000
      nc -zv -w 2 10.93.4.59 5001
      ```
+     <br><img width="950" height="111" alt="image" src="https://github.com/user-attachments/assets/8a13cf53-7d7d-4167-9f5b-03afda5cc45a" /><br>
      *Hasil:* Langsung keluar seketika dengan pesan `failed: Connection refused` tanpa menunggu jeda timeout.
    * Dari node **Lilith** (staf Geofront / luar switch):
      ```bash
      nc -zv -w 2 10.93.4.59 5000
      nc -zv -w 2 10.93.4.59 5001
      ```
+     <br><img width="908" height="110" alt="image" src="https://github.com/user-attachments/assets/d84f41f6-f345-4d80-8650-d7d6a902d44f" /><br>
      *Hasil:* Langsung keluar seketika dengan pesan `failed: Connection refused`.
 
 4. **Memastikan Seluruh Lalu Lintas Lain (di Luar TCP 5000 dan 5001) Tidak Terganggu**  
@@ -2420,11 +2426,13 @@ Pengujian Soal 13 disusun untuk membuktikan secara spesifik setiap butir persyar
      ```bash
      ping -c 2 10.93.4.59
      ```
+     <br><img width="881" height="221" alt="image" src="https://github.com/user-attachments/assets/be3cb958-7a1e-4e4e-ba93-a754a9362ac1" /><br>
      *Hasil:* **2 received, 0% packet loss** (ping lancar membuktikan hanya port 5000 & 5001 yang diblokir).
    * Dari node **Lilith**:
      ```bash
      ping -c 2 10.93.4.59
      ```
+     <br><img width="915" height="214" alt="image" src="https://github.com/user-attachments/assets/b41b9b56-1f72-4b16-a62b-dbd3ac6351c9" /><br>
      *Hasil:* **2 received, 0% packet loss**.
 
 5. **Memastikan Magi-Balthasar Tetap Dapat Melakukan Ping ke 8.8.8.8 dan Menerima Balasannya**  
@@ -2433,18 +2441,23 @@ Pengujian Soal 13 disusun untuk membuktikan secara spesifik setiap butir persyar
    ```bash
    ping -c 2 8.8.8.8
    ```
+   <br><img width="819" height="205" alt="image" src="https://github.com/user-attachments/assets/a0adc104-efe7-4614-8aa1-30941f660798" /><br>
    *Hasil:* **2 packets transmitted, 2 received, 0% packet loss**.
 
 6. **Membuktikan Koneksi dengan nc ke Port 5000 dan 5001: Unit-01 Berhasil, Sedangkan Lilith dan Melchior Ditolak Seketika**  
    *Ringkasan pembuktian komparatif dan verifikasi counter iptables:*  
    * Uji komparasi:
      * **Unit-01:** `nc -zv -w 2 10.93.4.59 5000` -> **open**
+     <br><img width="712" height="52" alt="image" src="https://github.com/user-attachments/assets/bb1116e8-2489-4857-a9de-fed0ca47acc2" /><br>
      * **Magi-Melchior:** `nc -zv -w 2 10.93.4.59 5000` -> **Connection refused**
+     <br><img width="911" height="54" alt="image" src="https://github.com/user-attachments/assets/8268539c-6152-4a10-9435-e8fd2f30eb9c" /><br>
      * **Lilith:** `nc -zv -w 2 10.93.4.59 5000` -> **Connection refused**
+     <br><img width="983" height="56" alt="image" src="https://github.com/user-attachments/assets/90b97ade-7aa4-4a7f-9a04-be0e4c76a43b" /><br>
    * Pemeriksaan counter paket pada aturan firewall di **Magi-Balthasar**:
      ```bash
      iptables -nvL INPUT
      ```
+     <br><img width="1532" height="267" alt="image" src="https://github.com/user-attachments/assets/3b19042f-c9b1-461f-90b8-5209c02adcaf" /><br>
      *Hasil:* Counter pada rule ACCEPT untuk subnet Cage (`10.93.4.64/29`) bertambah, dan counter pada rule REJECT untuk paket dari Melchior/Lilith bertambah.
 
 ---
