@@ -2736,30 +2736,201 @@ Lakukan pengujian dari masing-masing node penguji:
 ---
 
 ## Soal 15
-> Penafsiran soal dan secara ringkas kita disuruh ngapain aja
 
-1. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-      ```bash
-      # Contoh kode perintah
-      ini kode
-      ```
-      
-      atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-      ```
-      isi script
-      ```
-2. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
+* Batasi Tokyo3-Core agar hanya menjawab maksimal 5 ping per detik
+* Ping yang melebihi batas harus dibuang (DROP)
+* Jangan mengganggu ping normal yang masih di bawah batas (jeda minimal 3 detik antar paket)
+* Jangan membatasi ping yang dikirim Tokyo3-Core sendiri ke node lain atau internet
+* Pastikan rule mengenai paket yang tepat dan urutan rule benar
+* Memastikan layanan TCP port 80 dan 8080 pada Tokyo3-Core tidak terganggu
+* Buktikan dengan ping rapat dari Lilith (`ping -i 0.1 -c 50`), sebagian hilang, dan counter rule pembuangan naik
 
-    ```bash
-    # Contoh kode perintah
-    ini kode
-    ```
-    
-    atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-    ```
-    isi script
-    ```
-dst terserah butuh berapa step
+> Pada soal ini, kita mengamankan node pusat komando **Tokyo3-Core** (`10.93.4.106`) dari potensi serangan banjir ping (*ICMP Echo Flood*) menjelang Instrumentality. Kita menerapkan mekanisme pembatasan laju (*rate limiting*) menggunakan modul `limit` pada iptables dengan batas maksimum **5 ping per detik** (`-m limit --limit 5/second --limit-burst 5`). Paket `echo-request` yang melampaui batas tersebut akan langsung dibuang (`DROP`).
+> 
+> **Perhatian Khusus pada Jenis Paket dan Urutan Rule:**
+> 1. **Membedakan `echo-request` dan `echo-reply`:**
+>    Aturan pembatasan hanya boleh mengenai permintaan ping masuk (**ICMP tipe 8 / `echo-request`**). Balasan ping (**ICMP tipe 0 / `echo-reply`**) yang diterima Tokyo3-Core saat ia mem-ping node lain tidak boleh terkena limit, sehingga harus diizinkan secara eksplisit atau diizinkan sebelum aturan rate limit.
+> 2. **Perangkap Stateful Conntrack:**
+>    Jika aturan umum `conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT` diletakkan di atas aturan pembatasan ping, koneksi ping rapat beruntun dari host yang sama akan dianggap sebagai bagian dari koneksi `ESTABLISHED` yang sudah tercatat di tabel conntrack, sehingga paket ping berikutnya meloloskan diri dari rate limit (*bypass*). Oleh karena itu, urutan rule harus disusun secara presisi: balasan ping keluar (`echo-reply`) diizinkan lebih dulu, lalu filter rate limit untuk `echo-request`, lalu rule DROP untuk kelebihan `echo-request`, baru setelah itu `conntrack` untuk lalu lintas protokol lainnya.
+> 3. **Layanan TCP Port 80 dan 8080:**
+>    Layanan HTTP port 80 (`Welcome to $(hostname)`) dan port 8080 (`syifa imutz`) tetap dibiarkan berjalan normal karena policy dasar chain `INPUT` adalah `ACCEPT` dan filter hanya menargetkan protokol ICMP.
+
+---
+
+### Langkah Pengerjaan
+
+#### 1. Pembuatan Skrip Rate Limiting di Node Tokyo3-Core
+Skrip ini mengonfigurasi listener port 80 dan 8080, menyetel policy dasar `INPUT ACCEPT`, serta memasang filter pembatasan ping masuk dengan urutan rule yang tepat.
+
+Di Node **Tokyo3-Core** `nano /root/soal15.sh`:
+<details>
+<summary>Lihat skrip <b>/root/soal15.sh</b> di Tokyo3-Core</summary>
+
+```bash
+#!/bin/sh
+# Node: Tokyo3-Core (IP: 10.93.4.106)
+
+# 1. Pastikan listener port 80 dan 8080 aktif (dari Soal 8)
+pkill -f "nc -l -p 80" 2>/dev/null
+pkill -f "nc -l -p 8080" 2>/dev/null
+nohup sh -c 'while true; do echo "Welcome to $(hostname)" | nc -l -p 80; done' >/dev/null 2>&1 &
+nohup sh -c 'while true; do echo "syifa imutz" | nc -l -p 8080; done' >/dev/null 2>&1 &
+
+# 2. Reset chain INPUT (Flush & Default Policy ACCEPT)
+iptables -P INPUT ACCEPT
+iptables -F INPUT
+
+# 3. Izinkan interface loopback
+iptables -A INPUT -i lo -j ACCEPT
+
+# 4. Izinkan paket balasan ping yang diinisiasi oleh Tokyo3-Core sendiri (echo-reply / type 0)
+# Diletakkan sebelum limit agar ping keluar Tokyo3-Core tidak pernah terhambat
+iptables -A INPUT -p icmp --icmp-type echo-reply -j ACCEPT
+
+# 5. Batasi permintaan ping masuk (echo-request / type 8) maksimal 5 per detik
+# Memakai limit 5/sec dan burst 5 paket
+iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 5/second --limit-burst 5 -j ACCEPT
+
+# 6. Buang (DROP) kelebihan permintaan ping masuk yang melebihi batas 5 per detik
+iptables -A INPUT -p icmp --icmp-type echo-request -j DROP
+
+# 7. Izinkan koneksi established/related untuk lalu lintas lain (TCP, UDP, dll.)
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+# 8. Simpan aturan agar permanen
+iptables-save > /root/tokyo3.rules 2>/dev/null || true
+echo "Konfigurasi Rate Limiting Ping Soal 15 di Tokyo3-Core berhasil diterapkan."
+```
+</details>
+
+Beri izin eksekusi dan jalankan di **Tokyo3-Core**:
+```bash
+chmod +x /root/soal15.sh
+/root/soal15.sh
+```
+
+---
+
+### Testing
+
+Pengujian Soal 15 dirancang untuk membuktikan seluruh kriteria yang diminta: kondisi awal counter, pengujian banjir ping rapat, kenaikan counter rule pembuangan, pengujian ping biasa di bawah batas, pengujian ping keluar dari Tokyo3-Core, serta pengujian akses layanan HTTP.
+
+#### Skrip Pemeriksaan Status Firewall di Tokyo3-Core
+Di Node **Tokyo3-Core** `nano /root/soal15_testing.sh`:
+<details>
+<summary>Lihat skrip pengujian <b>/root/soal15_testing.sh</b> di Tokyo3-Core</summary>
+
+```bash
+#!/bin/sh
+echo "=== 1. STATUS LISTENER PORT 80 DAN 8080 ==="
+netstat -tuln | grep -E '80|8080'
+
+echo ""
+echo "=== 2. ATURAN FIREWALL TOKYO3-CORE (IPTABLES -S) ==="
+iptables -S INPUT
+
+echo ""
+echo "=== 3. COUNTER PACKET FIREWALL (IPTABLES -NVL) ==="
+iptables -nvL INPUT
+```
+</details>
+
+Beri izin eksekusi dan jalankan di **Tokyo3-Core**:
+```bash
+chmod +x /root/soal15_testing.sh
+/root/soal15_testing.sh
+```
+
+---
+
+#### Butir-Butir Pengujian dan Pembuktian
+
+1. **Pemeriksaan Kondisi Awal Counter pada Tokyo3-Core**  
+   *Membuktikan: Aturan limit dan drop terpasang dengan counter awal.*  
+   Jalankan di node **Tokyo3-Core**:
+   ```bash
+   iptables -nvL INPUT
+   ```
+   *Output Verifikasi:*
+   ```text
+   Chain INPUT (policy ACCEPT 0 packets, 0 bytes)
+    pkts bytes target     prot opt in     out     source               destination         
+       0     0 ACCEPT     all  --  lo     *       0.0.0.0/0            0.0.0.0/0           
+       0     0 ACCEPT     icmp --  *      *       0.0.0.0/0            0.0.0.0/0            icmptype 0
+       0     0 ACCEPT     icmp --  *      *       0.0.0.0/0            0.0.0.0/0            icmptype 8 limit: avg 5/sec burst 5
+       0     0 DROP       icmp --  *      *       0.0.0.0/0            0.0.0.0/0            icmptype 8
+       0     0 ACCEPT     all  --  *      *       0.0.0.0/0            0.0.0.0/0            ctstate RELATED,ESTABLISHED
+   ```
+   *Penjelasan:* Terlihat rule limit (maks 5/detik burst 5) dan rule drop berada pada posisi sebelum conntrack, siap memfilter ping masuk.
+
+2. **Pengujian Banjir Ping Rapat dari Node Lilith (`ping -i 0.1 -c 50`)**  
+   *Membuktikan: Ping yang dikirim melebihi batas laju (10 paket per detik selama 5 detik) sebagian dibuang oleh Tokyo3-Core.*  
+   Jalankan di node **Lilith**:
+   ```bash
+   ping -i 0.1 -c 50 10.93.4.106
+   ```
+   *Hasil Seharusnya:*
+   - Dari 50 paket yang dikirimkan dengan jeda 0.1 detik, sebagian paket hilang (*packet loss* berkisar antara 35% s.d. 50%).
+   - Contoh output:
+     ```text
+     50 packets transmitted, 30 received, 40% packet loss, time 5079ms
+     rtt min/avg/max/mdev = 0.533/0.935/1.352/0.214 ms
+     ```
+   *Penjelasan:* Karena Lilith mengirimkan 10 ping per detik sedangkan Tokyo3-Core dibatasi maksimal 5 ping per detik, kelebihan paket (~20 paket) jatuh ke rule DROP dan dibuang.
+
+3. **Verifikasi Kenaikan Counter Rule Pembuangan (`DROP`) pada Tokyo3-Core**  
+   *Membuktikan: Paket yang hilang pada pengujian butir 2 benar-benar dibuang oleh aturan firewall DROP, bukan karena masalah kabel atau rute.*  
+   Jalankan di node **Tokyo3-Core**:
+   ```bash
+   iptables -nvL INPUT
+   ```
+   *Output Verifikasi:*
+   ```text
+   Chain INPUT (policy ACCEPT 0 packets, 0 bytes)
+    pkts bytes target     prot opt in     out     source               destination         
+       0     0 ACCEPT     all  --  lo     *       0.0.0.0/0            0.0.0.0/0           
+       0     0 ACCEPT     icmp --  *      *       0.0.0.0/0            0.0.0.0/0            icmptype 0
+      30  2520 ACCEPT     icmp --  *      *       0.0.0.0/0            0.0.0.0/0            icmptype 8 limit: avg 5/sec burst 5
+      20  1680 DROP       icmp --  *      *       0.0.0.0/0            0.0.0.0/0            icmptype 8
+       0     0 ACCEPT     all  --  *      *       0.0.0.0/0            0.0.0.0/0            ctstate RELATED,ESTABLISHED
+   ```
+   *Penjelasan:* Counter pada rule `ACCEPT` bertambah tepat 30 paket, dan counter pada rule `DROP` bertambah tepat 20 paket (total 50 paket). Ini membuktikan pembuangan paket terjadi secara aktif di firewall Tokyo3-Core.
+
+4. **Pengujian Ping Normal dengan Jeda 3 Detik (`ping -i 3 -c 5`)**  
+   *Membuktikan: Ping normal yang berada di bawah batas laju berhasil 100% tanpa gangguan.*  
+   Jalankan di node **Lilith**:
+   ```bash
+   ping -i 3 -c 5 10.93.4.106
+   ```
+   *Hasil Seharusnya:*
+   ```text
+   5 packets transmitted, 5 received, 0% packet loss, time 12041ms
+   ```
+   *Penjelasan:* Jeda 3 detik antar paket jauh di bawah kapasitas token bucket (1 token terisi kembali setiap 200 milidetik), sehingga seluruh 5 paket ping diterima dengan status **0% packet loss**.
+
+5. **Pengujian Ping Keluar dari Tokyo3-Core Sendiri**  
+   *Membuktikan: Aturan firewall pada Tokyo3-Core tidak membatasi koneksi ping yang dikirimkan oleh Tokyo3-Core sendiri ke node lain.*  
+   Jalankan di node **Tokyo3-Core**:
+   ```bash
+   ping -c 3 10.93.4.74
+   ```
+   *Hasil Seharusnya:*
+   ```text
+   3 packets transmitted, 3 received, 0% packet loss, time 2002ms
+   ```
+   *Penjelasan:* Paket permintaan keluar (`echo-request`) melewati chain `OUTPUT` tanpa batasan, dan balasan masuk (`echo-reply` tipe 0) diterima langsung oleh rule `-p icmp --icmp-type echo-reply -j ACCEPT` sehingga tidak terkena aturan rate limit.
+
+6. **Pengujian Akses Layanan Web Port 80 dan 8080 dari Lilith**  
+   *Membuktikan: Layanan TCP lain pada Tokyo3-Core tidak terganggu oleh filter ICMP.*  
+   Jalankan di node **Lilith**:
+   ```bash
+   nc -w 2 10.93.4.106 80
+   nc -w 2 10.93.4.106 8080
+   ```
+   *Hasil Seharusnya:*
+   - Port 80: Menampilkan pesan `Welcome to Tokyo3-Core`.
+   - Port 8080: Menampilkan pesan `syifa imutz`.  
+   *Penjelasan:* Filter firewall dispesifikasikan secara ketat hanya untuk protokol `icmp` (`-p icmp`), sehingga paket protokol `tcp` langsung diteruskan ke port listener masing-masing tanpa hambatan.
 
 ---
 
