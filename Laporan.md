@@ -2312,13 +2312,10 @@ Di Node **Magi-Balthasar** `nano /root/soal13.sh`:
 command -v iptables >/dev/null 2>&1 || { apt-get update -qq && apt-get install -y -qq iptables; }
 command -v nc >/dev/null 2>&1 || { apt-get update -qq && apt-get install -y -qq netcat-traditional; }
 
-# 2. Aktifkan listener TCP 5000 dan 5001 di background jika belum aktif
-if ! netstat -tuln 2>/dev/null | grep -q ':5000 '; then
-    nohup nc.traditional -lvp 5000 -k >/dev/null 2>&1 &
-fi
-if ! netstat -tuln 2>/dev/null | grep -q ':5001 '; then
-    nohup nc.traditional -lvp 5001 -k >/dev/null 2>&1 &
-fi
+# 2. Aktifkan listener TCP 5000 dan 5001 di background
+pkill -f "nc -l -p" 2>/dev/null
+nohup sh -c 'while true; do nc -l -p 5000 >> /root/nc5000.log 2>&1; done' >/dev/null 2>&1 &
+nohup sh -c 'while true; do nc -l -p 5001 >> /root/nc5001.log 2>&1; done' >/dev/null 2>&1 &
 
 # 3. Reset chain INPUT (hanya flush aturan tanpa mengubah policy dasar)
 iptables -P INPUT ACCEPT
