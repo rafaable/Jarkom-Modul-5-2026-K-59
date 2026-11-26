@@ -1948,7 +1948,6 @@ iface eth0 inet static
 <img width="1112" height="826" alt="image" src="https://github.com/user-attachments/assets/2942ff9b-8194-411e-8b78-5c00a9411460" />
 
 ---
-
 ## Soal 7
 > Memasang `iptables` dan `netcat-traditional` di tiga node MAGI (Casper, Balthasar, Melchior) lewat script di `/root`, lalu menyalakan listener TCP sesuai glosarium (Casper 5000, Balthasar 5000 dan 5001, Melchior 5000). Node MAGI memakai image `debinet` karena `netcat-traditional` adalah paket Debian. Pengujian dilakukan dari Lilith.
 
@@ -2010,7 +2009,7 @@ iface eth0 inet static
    cat /root/nc5000.log      # Casper, Balthasar, Melchior
    cat /root/nc5001.log      # Balthasar
    ```
-   [screenshot: `netstat -tln` dan isi log di tiap node]
+   
 
 ---
 
@@ -2046,15 +2045,14 @@ iface eth0 inet static
    nc -w 3 10.93.4.106 80       # Welcome to Tokyo3-Core
    nc -w 3 10.93.4.106 8080     # syifa imutz
    ```
-   [screenshot: ketiga output]
+   
 4. Buktikan port yang tidak dilayani langsung gagal:
    ```bash
    time nc -w 5 10.93.4.106 22 </dev/null; echo "exit=$?"
    time nc -w 5 <IP-Pen-Pen> 22 </dev/null; echo "exit=$?"
    ```
    Hasil: selesai dalam hitungan milidetik dengan `exit=1`, artinya ditolak seketika, bukan timeout 5 detik.
-   [screenshot: output `time` dan `exit`]
-
+ 
 ---
 
 ## Soal 9
@@ -2075,7 +2073,7 @@ iface eth0 inet static
    # Armisael
    ping -c 2 10.93.4.81      # gateway, berhasil
    ```
-   [screenshot: kedua hasil ping]
+  
 3. Diagnosis di `Shigeru`:
    ```bash
    ip -br a
@@ -2087,7 +2085,7 @@ iface eth0 inet static
    cat /proc/sys/net/ipv4/icmp_echo_ignore_all
    ip route get 10.93.4.74
    ```
-   [screenshot: output sebelum dan sesudah script]
+
 
    Penyebab (ada empat):
 
@@ -2118,7 +2116,7 @@ iface eth0 inet static
    # Armisael
    ping -c 2 10.93.4.74      # berhasil
    ```
-   [screenshot: ping berhasil dan `ip route`, `ip rule` setelah perbaikan]
+  
 
 ---
 
@@ -2136,7 +2134,7 @@ iface eth0 inet static
    ```
    Kondisi acuan: Gendou hanya punya satu rule NAT `-s 10.93.0.0/21 -o eth0 -j MASQUERADE`; Misato tidak punya rule NAT.
 2. Buktikan gejala: Unit-01 `ping -c 2 8.8.8.8` gagal, Unit-01 ke Lilith (`10.93.4.74`) berhasil, Spy `ping -c 2 8.8.8.8` berhasil.
-   [screenshot]
+   
 3. Diagnosis di `Gendou` dan `Misato`: `ip route`, `iptables -S`, `iptables -t nat -S`.
 
    Penyebab (dua):
@@ -2165,7 +2163,7 @@ iface eth0 inet static
    iptables -t nat -nvL POSTROUTING
    ```
    Hasil: ping berhasil, dan counter `MASQUERADE` naik (7 paket pada pengujian).
-   [screenshot]
+   
 
    Alamat sumber diterjemahkan di **Gendou**, satu-satunya router yang terhubung ke NAT1. Misato tidak boleh menerjemahkan alamat.
 
@@ -2199,8 +2197,7 @@ iface eth0 inet static
    iptables -nvL INPUT       # counter rule DROP naik
    cat /root/nc5000.log      # pesan dari Lilith tetap masuk
    ```
-   [screenshot: `iptables -nvL INPUT` (counter 10 paket pada pengujian), hasil ketiga ping, dan isi log]
-
+  
 ---
 
 ## Soal 12
@@ -2280,7 +2277,7 @@ iface eth0 inet static
    # Lilith atau Balthasar
    ping -c 2 10.93.4.58      # tetap gagal
    ```
-   [screenshot: semua hasil di atas dan `iptables -S`]
+  
 
 ---
 ## Soal 13
