@@ -2463,30 +2463,271 @@ Pengujian Soal 13 disusun untuk membuktikan secara spesifik setiap butir persyar
 ---
 
 ## Soal 14
-> Penafsiran soal dan secara ringkas kita disuruh ngapain aja
 
-1. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-      ```bash
-      # Contoh kode perintah
-      ini kode
-      ```
-      
-      atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-      ```
-      isi script
-      ```
-2. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
+* Membatasi akses ping (`ICMP`) dan `TCP port 80` pada node **Pen-Pen** berdasarkan jadwal dan kategori node
+* Pilot hanya boleh mengakses pada hari Senin–Jumat, pukul 08.00–16.00 WIB
+* Staf Geofront hanya boleh mengakses setiap hari, pukul 17.00–23.00 WIB
+* Terduga Dummy System tidak boleh mengakses kapan pun (selalu ditolak)
+* Node lainnya bebas mengakses tanpa batasan jadwal
+* Menyimpan jadwal sebagai variabel di awal skrip (`PILOT_START`, `PILOT_STOP`, `PILOT_DAYS`, `STAF_START`, `STAF_STOP`)
+* Mengonversikan jam WIB ke UTC karena iptables membaca waktu UTC (WIB - 7 Jam)
+* Membuktikan hasil ping dari Unit-01, Lilith, dan Spy pada dua kondisi: saat jadwal cocok dan tidak cocok dengan waktu sekarang tanpa mengubah jam komputer
 
-    ```bash
-    # Contoh kode perintah
-    ini kode
-    ```
-    
-    atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-    ```
-    isi script
-    ```
-dst terserah butuh berapa step
+> Pada soal ini, kita membatasi akses layanan ping (`ICMP echo-request`) dan web HTTP (`TCP port 80`) pada server **Pen-Pen** (`10.93.3.194`) di Switch-Medic berdasarkan kategori kelompok pengirim dan rentang waktu berkunjung. Karena modul `time` pada kernel Linux (`iptables -m time`) membaca waktu acuan sistem dalam zona waktu Universal Time Coordinated (UTC), sedangkan jadwal di soal dinyatakan dalam Waktu Indonesia Barat (WIB / UTC+7), seluruh parameter jam harus dikonversikan dengan mengurangi 7 jam dari waktu WIB.
+> 
+> Pembagian kategori dan waktu berkunjung:
+> 1. **Pilot** (Unit-01, Unit-02, Unit-00 di Switch-Cage `10.93.4.64/29`, serta Sachiel di Switch-Bunker `10.93.3.130/32`): 08.00–16.00 WIB (01:00–09:00 UTC), hanya Senin sampai Jumat (`Mon,Tue,Wed,Thu,Fri`).
+> 2. **Staf Geofront** (Lilith dan Adam di Switch-Dogma `10.93.4.72/29`): 17.00–23.00 WIB (10:00–16:00 UTC), setiap hari (`Mon,Tue,Wed,Thu,Fri,Sat,Sun`).
+> 3. **Terduga Dummy System** (Dummy-Plug & Entry-Plug di Switch-Lab `10.93.4.48/29`, serta Spy di Switch-Intel `10.93.4.100/30`): Tidak pernah diizinkan (selalu di-`DROP`).
+> 4. **Lainnya** (Semua node di luar ketiga kategori di atas): Bebas tanpa batasan waktu (selalu di-`ACCEPT`).
+>
+> Sesuai ketentuan, jam pada komputer praktikum dilarang diubah. Oleh karena itu, pengujian jadwal dilakukan dengan memodifikasi variabel waktu di skrip agar mencakup jam saat ini (kondisi cocok) lalu mengembalikannya ke jadwal default soal (kondisi tidak cocok).
+
+---
+
+### Langkah Pengerjaan
+
+#### 1. Konfigurasi Prasyarat Gateway pada Router Maya
+Sebelum memasang aturan pada Pen-Pen, pastikan router **Maya** (sebagai gateway Switch-Medic) dapat meneruskan paket dari dan menuju jaringan luar.
+
+Di Node **Maya** `nano /root/soal3.sh`:
+<details>
+<summary>Lihat skrip gateway di Maya</summary>
+
+```bash
+#!/bin/sh
+# Pastikan IP forwarding aktif
+sysctl -w net.ipv4.ip_forward=1
+
+# Pasang default route mengarah ke Fuyutsuki (router induk)
+ip route replace default via 10.93.4.125 dev eth0
+```
+</details>
+
+Beri izin eksekusi dan jalankan di **Maya**:
+```bash
+chmod +x /root/soal3.sh
+/root/soal3.sh
+```
+
+> Router Maya menghubungkan Switch-Medic (`10.93.3.192/27`) ke router Fuyutsuki. Jika rute default belum terpasang di Maya, paket balasan dari Pen-Pen tidak akan dapat kembali ke router Gendou maupun node pengirim lain (menyebabkan error *Destination Host Unreachable*).
+
+#### 2. Pembuatan Skrip Firewall dan Listener di Node Pen-Pen
+Seluruh aturan pembatasan akses waktu dan kategori dipasang pada chain `INPUT` di **Pen-Pen**. Jadwal disimpan dalam 5 variabel di baris awal berkas skrip.
+
+Di Node **Pen-Pen** `nano /root/soal14.sh`:
+<details>
+<summary>Lihat skrip <b>/root/soal14.sh</b> di Pen-Pen</summary>
+
+```bash
+#!/bin/sh
+# Node: Pen-Pen (IP: 10.93.3.194)
+
+# JADWAL WAKTU KUNJUNGAN (Konversi ke UTC: WIB - 7 Jam)
+# - Pilot: 08.00 - 16.00 WIB (01:00 - 09:00 UTC), Senin s.d. Jumat
+# - Staf:  17.00 - 23.00 WIB (10:00 - 16:00 UTC), Setiap hari
+# Variabel ini dapat disesuaikan saat pengujian untuk mencocokkan jam sekarang.
+
+PILOT_START="${PILOT_START:-01:00}"
+PILOT_STOP="${PILOT_STOP:-09:00}"
+PILOT_DAYS="${PILOT_DAYS:-Mon,Tue,Wed,Thu,Fri}"
+STAF_START="${STAF_START:-10:00}"
+STAF_STOP="${STAF_STOP:-16:00}"
+
+# 1. Pastikan listener HTTP TCP port 80 aktif di background
+pkill -f "nc -l -p 80" 2>/dev/null
+nohup sh -c 'while true; do echo "Welcome to $(hostname)" | nc -l -p 80; done' >/dev/null 2>&1 &
+
+# 2. Reset chain INPUT
+iptables -P INPUT ACCEPT
+iptables -F INPUT
+
+# 3. Izinkan interface loopback dan koneksi yang telah terbentuk (Stateful)
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+# 4. KELOMPOK TERDUGA DUMMY SYSTEM (Tidak pernah diizinkan / Selalu ditolak)
+# Dummy-Plug (.51) & Entry-Plug (.50) di Switch-Lab (10.93.4.48/29)
+# Spy (.102) di Switch-Intel (10.93.4.100/30)
+iptables -A INPUT -s 10.93.4.48/29 -p icmp --icmp-type echo-request -j DROP
+iptables -A INPUT -s 10.93.4.48/29 -p tcp --dport 80 -j DROP
+iptables -A INPUT -s 10.93.4.100/30 -p icmp --icmp-type echo-request -j DROP
+iptables -A INPUT -s 10.93.4.100/30 -p tcp --dport 80 -j DROP
+
+# 5. KELOMPOK PILOT (08.00 - 16.00 WIB, Senin s.d. Jumat)
+# Subnet Switch-Cage (Unit-01, Unit-02, Unit-00: 10.93.4.64/29)
+# Sachiel di Switch-Bunker (10.93.3.130/32)
+# - Jika waktu dan hari sesuai jadwal -> ACCEPT
+iptables -A INPUT -s 10.93.4.64/29 -p icmp --icmp-type echo-request -m time --timestart "$PILOT_START" --timestop "$PILOT_STOP" --weekdays "$PILOT_DAYS" -j ACCEPT
+iptables -A INPUT -s 10.93.4.64/29 -p tcp --dport 80 -m time --timestart "$PILOT_START" --timestop "$PILOT_STOP" --weekdays "$PILOT_DAYS" -j ACCEPT
+iptables -A INPUT -s 10.93.3.130/32 -p icmp --icmp-type echo-request -m time --timestart "$PILOT_START" --timestop "$PILOT_STOP" --weekdays "$PILOT_DAYS" -j ACCEPT
+iptables -A INPUT -s 10.93.3.130/32 -p tcp --dport 80 -m time --timestart "$PILOT_START" --timestop "$PILOT_STOP" --weekdays "$PILOT_DAYS" -j ACCEPT
+# - Jika di luar jadwal -> DROP
+iptables -A INPUT -s 10.93.4.64/29 -p icmp --icmp-type echo-request -j DROP
+iptables -A INPUT -s 10.93.4.64/29 -p tcp --dport 80 -j DROP
+iptables -A INPUT -s 10.93.3.130/32 -p icmp --icmp-type echo-request -j DROP
+iptables -A INPUT -s 10.93.3.130/32 -p tcp --dport 80 -j DROP
+
+# 6. KELOMPOK STAF GEOFRONT (17.00 - 23.00 WIB, Setiap Hari)
+# Subnet Switch-Dogma (Lilith, Adam: 10.93.4.72/29)
+# - Jika waktu sesuai jadwal -> ACCEPT
+iptables -A INPUT -s 10.93.4.72/29 -p icmp --icmp-type echo-request -m time --timestart "$STAF_START" --timestop "$STAF_STOP" -j ACCEPT
+iptables -A INPUT -s 10.93.4.72/29 -p tcp --dport 80 -m time --timestart "$STAF_START" --timestop "$STAF_STOP" -j ACCEPT
+# - Jika di luar jadwal -> DROP
+iptables -A INPUT -s 10.93.4.72/29 -p icmp --icmp-type echo-request -j DROP
+iptables -A INPUT -s 10.93.4.72/29 -p tcp --dport 80 -j DROP
+
+# 7. KELOMPOK LAINNYA (Bebas tanpa batasan)
+# Semua host selain ketiga kategori di atas bebas mengakses ping dan TCP 80
+iptables -A INPUT -p icmp --icmp-type echo-request -j ACCEPT
+iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+
+# 8. Simpan aturan agar bertahan
+iptables-save > /root/penpen.rules 2>/dev/null || true
+echo "Konfigurasi Firewall Soal 14 di Pen-Pen berhasil diterapkan."
+```
+</details>
+
+Beri izin eksekusi dan jalankan skrip di **Pen-Pen**:
+```bash
+chmod +x /root/soal14.sh
+/root/soal14.sh
+```
+
+---
+
+### Testing
+
+Pengujian Soal 14 disusun secara lengkap untuk membuktikan setiap kriteria soal, mencakup pemeriksaan konfigurasi, pengujian saat jadwal cocok dengan waktu sekarang, dan pengujian saat jadwal di luar waktu sekarang.
+
+#### Skrip Pemeriksaan Status Server Pen-Pen
+Di Node **Pen-Pen** `nano /root/soal14_testing.sh`:
+<details>
+<summary>Lihat skrip pengujian <b>/root/soal14_testing.sh</b> di Pen-Pen</summary>
+
+```bash
+#!/bin/sh
+echo "=== 1. WAKTU SERVER (UTC) ==="
+date -u
+
+echo ""
+echo "=== 2. LISTENER HTTP PORT 80 ==="
+netstat -tuln | grep 80 || echo "Listener port 80 tidak aktif"
+
+echo ""
+echo "=== 3. ATURAN FIREWALL PEN-PEN (IPTABLES -S) ==="
+iptables -S INPUT
+
+echo ""
+echo "=== 4. COUNTER PACKET (IPTABLES -NVL) ==="
+iptables -nvL INPUT
+```
+</details>
+
+Beri izin eksekusi dan jalankan di **Pen-Pen**:
+```bash
+chmod +x /root/soal14_testing.sh
+/root/soal14_testing.sh
+```
+
+---
+
+#### Pengujian Kasus 1: Jadwal Disesuaikan (Cocok dengan Jam Sekarang)
+Langkah manual untuk pengujian kondisi cocok:
+1. Periksa jam UTC saat ini di Pen-Pen dengan perintah `date -u` (misalnya terbaca jam `17:45 UTC`).
+2. Jalankan skrip dengan menyuntikkan variabel jadwal yang mencakup jam saat ini:
+   ```bash
+   PILOT_START="17:00" PILOT_STOP="19:00" PILOT_DAYS="Mon,Tue,Wed,Thu,Fri" STAF_START="17:00" STAF_STOP="19:00" /root/soal14.sh
+   ```
+
+Lakukan pengujian dari masing-masing node penguji:
+
+1. **Uji dari Node Unit-01 (Kategori Pilot - Jadwal Sesuai)**  
+   *Membuktikan: Pilot diizinkan mengakses Pen-Pen karena jam berada dalam rentang jadwal dan hari kerja.*  
+   Jalankan di node **Unit-01**:
+   ```bash
+   ping -c 2 -W 2 10.93.3.194
+   nc -w 2 10.93.3.194 80
+   ```
+   *Hasil Seharusnya:*
+   - Ping: **2 received, 0% packet loss**.
+   - Netcat TCP 80: Menampilkan pesan `Welcome to Pen-Pen`.  
+   *Penjelasan:* Alamat sumber Unit-01 (`10.93.4.66`) cocok dengan rule `-s 10.93.4.64/29 -m time` sehingga paket langsung diterima (`ACCEPT`).
+
+2. **Uji dari Node Lilith (Kategori Staf Geofront - Jadwal Sesuai)**  
+   *Membuktikan: Staf Geofront diizinkan mengakses Pen-Pen saat jam kunjungannya aktif.*  
+   Jalankan di node **Lilith**:
+   ```bash
+   ping -c 2 -W 2 10.93.3.194
+   nc -w 2 10.93.3.194 80
+   ```
+   *Hasil Seharusnya:*
+   - Ping: **2 received, 0% packet loss**.
+   - Netcat TCP 80: Menampilkan pesan `Welcome to Pen-Pen`.  
+   *Penjelasan:* Alamat sumber Lilith (`10.93.4.74`) cocok dengan rule `-s 10.93.4.72/29 -m time` kategori Staf sehingga paket diterima (`ACCEPT`).
+
+3. **Uji dari Node Spy (Kategori Terduga Dummy System - Selalu Ditolak)**  
+   *Membuktikan: Kelompok Terduga Dummy System tetap ditolak meskipun jam server sedang aktif.*  
+   Jalankan di node **Spy**:
+   ```bash
+   ping -c 2 -W 2 10.93.3.194
+   nc -w 2 10.93.3.194 80
+   ```
+   *Hasil Seharusnya:*
+   - Ping: **2 packets transmitted, 0 received, 100% packet loss** (permintaan dibuang).
+   - Netcat TCP 80: Menggantung sampai jeda 2 detik selesai (*timeout*) tanpa menerima balasan.  
+   *Penjelasan:* Aturan pemblokiran Dummy System (`-s 10.93.4.100/30 -j DROP`) diletakkan di baris paling atas mendahului aturan waktu, memastikan paket dari Spy langsung dibuang tanpa memeriksa jadwal.
+
+---
+
+#### Pengujian Kasus 2: Jadwal Default Soal (Tidak Cocok / Di Luar Jam Operasional)
+Langkah manual untuk pengujian kondisi tidak cocok:
+1. Kembalikan variabel skrip ke jadwal resmi soal (Pilot: `01:00-09:00 UTC`, Staf: `10:00-16:00 UTC`):
+   ```bash
+   /root/soal14.sh
+   ```
+2. Karena jam server saat ini (misalnya `17:45 UTC`) berada di luar rentang `01:00-09:00` dan `10:00-16:00`, seluruh akses dari Pilot dan Staf akan jatuh ke aturan penolakan (`DROP`).
+
+Lakukan pengujian dari masing-masing node penguji:
+
+1. **Uji dari Node Unit-01 (Kategori Pilot - Di Luar Jadwal)**  
+   *Membuktikan: Pilot dilarang mengakses Pen-Pen di luar jam operasional yang ditentukan.*  
+   Jalankan di node **Unit-01**:
+   ```bash
+   ping -c 2 -W 2 10.93.3.194
+   ```
+   *Hasil Seharusnya:* **2 packets transmitted, 0 received, 100% packet loss**.  
+   *Penjelasan:* Paket tidak cocok dengan rule `-m time` Pilot, sehingga diteruskan ke baris berikutnya yaitu rule `-s 10.93.4.64/29 -j DROP` yang membuang paket.
+
+2. **Uji dari Node Lilith (Kategori Staf Geofront - Di Luar Jadwal)**  
+   *Membuktikan: Staf Geofront dilarang mengakses Pen-Pen di luar jam 17.00–23.00 WIB.*  
+   Jalankan di node **Lilith**:
+   ```bash
+   ping -c 2 -W 2 10.93.3.194
+   ```
+   *Hasil Seharusnya:* **2 packets transmitted, 0 received, 100% packet loss**.  
+   *Penjelasan:* Paket Lilith melewati batas waktu Staf sehingga dieksekusi oleh rule `-s 10.93.4.72/29 -j DROP`.
+
+3. **Uji dari Node Spy (Kategori Terduga Dummy System)**  
+   *Membuktikan: Spy tetap terblokir 100% seperti pada kondisi pertama.*  
+   Jalankan di node **Spy**:
+   ```bash
+   ping -c 2 -W 2 10.93.3.194
+   ```
+   *Hasil Seharusnya:* **2 packets transmitted, 0 received, 100% packet loss**.  
+   *Penjelasan:* Terduga Dummy System memiliki status *unconditional drop* (selalu dibuang kapan pun).
+
+4. **Uji dari Node Lainnya (Contoh: Magi-Casper)**  
+   *Membuktikan: Node kategori Lainnya tetap bebas mengakses Pen-Pen kapan saja tanpa terpengaruh batasan jadwal.*  
+   Jalankan di node **Magi-Casper**:
+   ```bash
+   ping -c 2 -W 2 10.93.3.194
+   nc -w 2 10.93.3.194 80
+   ```
+   *Hasil Seharusnya:*
+   - Ping: **2 received, 0% packet loss**.
+   - Netcat TCP 80: Menampilkan pesan `Welcome to Pen-Pen`.  
+   *Penjelasan:* Casper (`10.93.4.58`) bukan anggota Dummy System, Pilot, maupun Staf, sehingga paketnya meluncur ke rule default `ACCEPT` untuk kategori Lainnya.
 
 ---
 
