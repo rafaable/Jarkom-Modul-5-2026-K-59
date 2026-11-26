@@ -3101,6 +3101,7 @@ chmod +x /root/soal16_testing.sh
    ```bash
    iptables -S INPUT
    ```
+   <br><img width="1238" height="218" alt="image" src="https://github.com/user-attachments/assets/c0f3bc8d-0bb8-4b77-ba2f-0c82de4f9daa" /><br>
    *Output Verifikasi:*
    ```text
    -P INPUT ACCEPT
@@ -3122,6 +3123,7 @@ chmod +x /root/soal16_testing.sh
    nc -zv -w 2 10.93.4.106 23
    nc -zv -w 2 10.93.4.106 3306
    ```
+   <br><img width="941" height="148" alt="image" src="https://github.com/user-attachments/assets/96a6f3d6-1f35-46fd-8670-f82255deef45" /><br>
    *Output Verifikasi:*
    ```text
    nc: connect to 10.93.4.106 port 22 (tcp) failed: Connection refused
@@ -3136,6 +3138,7 @@ chmod +x /root/soal16_testing.sh
    ```bash
    iptables -S INPUT | grep "SCAN-NERV"
    ```
+   <br><img width="1217" height="53" alt="image" src="https://github.com/user-attachments/assets/be3159e7-2b9a-48b1-a1d5-27b8e0608424" /><br>
    *Output Verifikasi:*
    ```text
    -A INPUT -s 10.93.4.51/32 -p tcp -m multiport --dports 22,23,3306 -j LOG --log-prefix "SCAN-NERV: "
@@ -3150,6 +3153,7 @@ chmod +x /root/soal16_testing.sh
    time nc -zv -w 2 10.93.4.106 23
    time nc -zv -w 2 10.93.4.106 3306
    ```
+   <br><img width="910" height="435" alt="image" src="https://github.com/user-attachments/assets/b2f72c06-b3f1-4c61-8222-9025c761ee16" /><br>
    *Output Verifikasi:*
    ```text
    nc: connect to 10.93.4.106 port 22 (tcp) failed: Connection refused
@@ -3175,7 +3179,7 @@ chmod +x /root/soal16_testing.sh
    nc -w 2 10.93.4.106 80
    nc -w 2 10.93.4.106 8080
    ```
-   *Hasil Seharusnya:*
+   <br><img width="1231" height="376" alt="image" src="https://github.com/user-attachments/assets/1f6d56df-5104-48a3-be1b-0f188bdea7b0" /><br>
    - Port 80: Menampilkan pesan `Welcome to Tokyo3-Core` (exit code 0).
    - Port 8080: Menampilkan pesan `syifa imutz` (exit code 0).  
    *Penjelasan:* Port 80 dan 8080 tidak masuk ke dalam daftar port terlarang (multiport 22, 23, 3306), sehingga paket langsung diteruskan ke listener masing-masing port tanpa halangan.
@@ -3188,7 +3192,7 @@ chmod +x /root/soal16_testing.sh
    nc -w 2 10.93.4.106 8080
    nc -zv -w 2 10.93.4.106 22
    ```
-   *Hasil Seharusnya:*
+   <br><img width="844" height="195" alt="image" src="https://github.com/user-attachments/assets/0bebb702-f21a-499f-9fba-3a2675f51f8d" /><br>
    - Port 80 dan 8080 merespons dengan banner normal.
    - Pengecekan counter rule `LOG` di Tokyo3-Core menunjukkan counter **tidak bertambah** (tetap).  
    *Penjelasan:* Filter firewall secara ketat hanya menargetkan IP sumber Dummy-Plug (`-s 10.93.4.51`), sehingga node lain di Geofront tidak terpengaruh oleh aturan pemblokiran ini.
@@ -3199,6 +3203,7 @@ chmod +x /root/soal16_testing.sh
    ```bash
    iptables -nvL INPUT | grep -E 'LOG|REJECT'
    ```
+   <br><img width="1720" height="99" alt="image" src="https://github.com/user-attachments/assets/ff8ea9de-0d16-45e9-9401-25424150629f" /><br>
    *Output Verifikasi:*
    ```text
    Chain INPUT (policy ACCEPT)
