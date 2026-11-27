@@ -3520,83 +3520,516 @@ chmod +x /root/soal17_testing.sh
 ---
 
 ## Soal 18
-> Penafsiran soal dan secara ringkas kita disuruh ngapain aja
 
-1. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-      ```bash
-      # Contoh kode perintah
-      ini kode
-      ```
-      
-      atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-      ```
-      isi script
-      ```
-2. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
+- Memasang aturan firewall di **Shigeru** untuk menjaga zona sensitif (Switch-Monolith dan Switch-Radar)
+- Mengizinkan node di dalam zona sensitif memulai koneksi keluar ke mana saja dan menerima balasannya
+- Melarang semua node di luar zona memulai koneksi baru ke dalam zona berdasarkan arah datangnya (dari sisi Gendou) tanpa menulis subnet luar satu per satu
+- Memberikan satu pengecualian: ping (`ICMP echo-request`) dari subnet Switch-Terminal (`10.93.4.56/29`) tetap boleh masuk
+- Membuktikan ping dari Magi-Casper ke Zeruel berhasil, sedangkan ping dari Lilith ke Zeruel gagal
 
-    ```bash
-    # Contoh kode perintah
-    ini kode
-    ```
-    
-    atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-    ```
-    isi script
-    ```
-dst terserah butuh berapa step
+> Pada soal ini, kita mengamankan zona sensitif **Switch-Monolith** (`10.93.4.80/29`) dan **Switch-Radar** (`10.93.4.88/29`) pada router penjaganya yaitu **Shigeru**. Kebijakan firewall diterapkan pada chain `FORWARD` berdasarkan arah antarmuka (*interface-based filtering*): seluruh paket baru yang masuk melalui antarmuka `eth0` (arah router pusat Gendou) langsung ditolak (`DROP`) tanpa perlu mendaftarkan subnet luar satu per satu, sehingga setiap segmen baru di luar zona otomatis ikut terblokir. Satu-satunya lalu lintas baru yang diizinkan masuk dari `eth0` adalah permintaan ping (`ICMP echo-request`) dari subnet **Switch-Terminal** (`10.93.4.56/29`). Sementara itu, seluruh lalu lintas yang dimulai dari dalam zona sensitif (`eth1` arah Makoto/Radar dan `eth2` arah Switch-Monolith) menuju keluar (`eth0`) diizinkan beserta paket balasannya (`ESTABLISHED,RELATED`).
+
+### Langkah Pengerjaan
+
+#### 1. Pembuatan Skrip Firewall Zona Sensitif di Node Shigeru
+
+Di Node **Shigeru** `nano /root/soal18.sh`:
+<details>
+<summary>Lihat skrip <b>/root/soal18.sh</b> di Shigeru</summary>
+
+```bash
+#!/bin/sh
+# Node: Shigeru (Penjaga Zona Sensitif: Switch-Monolith & Switch-Radar)
+# eth0: menghadap ke Gendou (arah luar zona)
+# eth1: menghadap ke Makoto -> Switch-Radar (10.93.4.88/29)
+# eth2: menghadap ke Switch-Monolith (10.93.4.80/29)
+
+# 1. Pastikan IP forwarding dan rute dari Soal 2 & 3 tetap aktif
+sysctl -w net.ipv4.ip_forward=1 >/dev/null
+ip route replace default via 10.93.4.157 dev eth0
+ip route replace 10.93.4.88/29 via 10.93.4.162 dev eth1
+
+# 2. Reset chain FORWARD
+iptables -P FORWARD ACCEPT
+iptables -F FORWARD
+
+# 3. Izinkan paket balasan dari koneksi yang sudah berjalan (Stateful Inspection)
+# Memastikan koneksi yang dimulai dari dalam zona sensitif ke luar tetap mendapat balasan
+iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+# 4. Izinkan node di dalam zona sensitif memulai koneksi baru ke luar (melalui eth0)
+iptables -A FORWARD -i eth1 -o eth0 -j ACCEPT
+iptables -A FORWARD -i eth2 -o eth0 -j ACCEPT
+
+# 5. Pengecualian: Izinkan ping (ICMP echo-request) dari subnet Switch-Terminal (10.93.4.56/29) masuk dari eth0
+iptables -A FORWARD -i eth0 -s 10.93.4.56/29 -p icmp --icmp-type echo-request -j ACCEPT
+
+# 6. Tolak semua koneksi baru lainnya yang datang dari arah Gendou (eth0) tanpa menulis subnet luar satu per satu
+iptables -A FORWARD -i eth0 -j DROP
+
+# 7. Simpan aturan firewall
+iptables-save > /root/shigeru.rules 2>/dev/null || true
+echo "Konfigurasi Firewall Zona Sensitif Soal 18 di Shigeru berhasil diterapkan."
+
+```
+
+Beri izin eksekusi dan jalankan skrip di **Shigeru**:
+
+```bash
+chmod +x /root/soal18.sh
+/root/soal18.sh
+
+```
+
+### Testing
+
+Pengujian Soal 18 membuktikan seluruh kriteria penjagaan zona sensitif di router **Shigeru**:
+
+1. **Verifikasi Aturan Firewall pada Shigeru (`iptables -S FORWARD`)**
+*Membuktikan: Filter berbasis interface (`-i eth0`) dan pengecualian subnet Switch-Terminal terpasang dengan urutan yang tepat.*
+Jalankan di node **Shigeru**:
+```bash
+iptables -S FORWARD
+
+```
+
+
+*Output Verifikasi:*
+```text
+-P FORWARD ACCEPT
+-A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -i eth1 -o eth0 -j ACCEPT
+-A FORWARD -i eth2 -o eth0 -j ACCEPT
+-A FORWARD -s 10.93.4.56/29 -i eth0 -p icmp -m icmp --icmp-type 8 -j ACCEPT
+-A FORWARD -i eth0 -j DROP
+
+```
+
+
+2. **Membuktikan Ping dari Magi-Casper (Subnet Terminal) ke Zeruel Berhasil**
+*Membuktikan: Pengecualian ping dari subnet Switch-Terminal (`10.93.4.56/29`) diizinkan masuk ke zona sensitif.*
+Jalankan di node **Magi-Casper** (`10.93.4.58`):
+```bash
+ping -c 2 10.93.4.82
+
+```
+
+
+*Hasil:* **2 packets transmitted, 2 received, 0% packet loss**.
+3. **Membuktikan Ping dari Lilith (Luar Zona) ke Zeruel Gagal**
+*Membuktikan: Node di luar zona sensitif tidak dapat memulai koneksi masuk dari arah Gendou (`eth0`).*
+Jalankan di node **Lilith** (`10.93.4.74`):
+```bash
+ping -c 2 -W 2 10.93.4.82
+
+```
+
+
+*Hasil:* **2 packets transmitted, 0 received, 100% packet loss**.
+4. **Membuktikan Node di Dalam Zona Sensitif Bebas Memulai Koneksi ke Luar**
+*Membuktikan: Zeruel dapat menghubungi node di luar zona maupun internet dan menerima balasannya.*
+Jalankan di node **Zeruel** (`10.93.4.82`):
+```bash
+ping -c 2 10.93.4.74
+ping -c 2 8.8.8.8
+
+```
+
+
+*Hasil:* Kedua pengujian berhasil (**0% packet loss**).
+5. **Verifikasi Counter Paket pada Shigeru (`iptables -nvL FORWARD`)**
+Jalankan di node **Shigeru**:
+```bash
+iptables -nvL FORWARD
+
+```
+
+
 
 ---
 
 ## Soal 19
-> Penafsiran soal dan secara ringkas kita disuruh ngapain aja
 
-1. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-      ```bash
-      # Contoh kode perintah
-      ini kode
-      ```
-      
-      atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-      ```
-      isi script
-      ```
-2. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
+* Memblokir seluruh lalu lintas masuk dan keluar **Armisael** (`10.93.4.83`), termasuk ke gateway Shigeru (`10.93.4.81`) dan tetangga satu switch yaitu **Zeruel** (`10.93.4.82`)
+* Memastikan **Zeruel** yang berada satu switch dengan Armisael tidak ikut terisolasi
+* Tidak mengerjakan konfigurasi isolasi di dalam node Armisael
+* Menyalakan listener TCP port 9000 di Armisael, Zeruel, dan Lilith
+* Membuktikan `ping` dan `nc` dari Armisael ke Seele (`8.8.8.8` TCP 53), Zeruel (TCP 9000), dan Lilith (TCP 9000) gagal
+* Membuktikan `ping` dan `nc` dari Zeruel ke Seele (`8.8.8.8` TCP 53) dan Lilith (TCP 9000) berhasil
 
-    ```bash
-    # Contoh kode perintah
-    ini kode
-    ```
-    
-    atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-    ```
-    isi script
-    ```
-dst terserah butuh berapa step
+> Pada soal ini, pengkhianat **Armisael** (`10.93.4.83`) diisolasi total dari jaringan tanpa menyentuh konfigurasi di dalam node Armisael itu sendiri. Karena Armisael dan **Zeruel** (`10.93.4.82`) berada dalam satu segmen switch (**Switch-Monolith** `10.93.4.80/29`), isolasi diterapkan pada dua lapisan secara presisi:
+> 1. **Isolasi Layer-3 di Router Shigeru:** Memblokir seluruh lalu lintas masuk maupun keluar untuk IP sumber/tujuan `10.93.4.83` pada chain `INPUT`, `OUTPUT`, dan `FORWARD` sehingga Armisael tidak dapat berbicara dengan gateway maupun subnet mana pun di luar Switch-Monolith.
+> 2. **Isolasi Layer-2 di Switch-Monolith (atau Zeruel):** Memblokir komunikasi satu segmen switch terhadap MAC address / IP `10.93.4.83` sehingga Armisael tidak dapat berkomunikasi dengan tetangga satu switch-nya (Zeruel), sementara Zeruel sendiri tetap bebas berkomunikasi dengan seluruh jaringan Geofront maupun internet.
+> 
+> 
+
+### Langkah Pengerjaan
+
+#### 1. Pembuatan Skrip Isolasi Layer-3 Armisael di Node Shigeru
+
+Di Node **Shigeru** `nano /root/soal19_shigeru.sh`:
+
+```bash
+#!/bin/sh
+# Isolasi Layer-3 IP Armisael (10.93.4.83) di Shigeru agar tidak bisa keluar/masuk subnet
+iptables -D FORWARD -s 10.93.4.83 -j DROP 2>/dev/null || true
+iptables -D FORWARD -d 10.93.4.83 -j DROP 2>/dev/null || true
+iptables -D INPUT -s 10.93.4.83 -j DROP 2>/dev/null || true
+iptables -D OUTPUT -d 10.93.4.83 -j DROP 2>/dev/null || true
+
+iptables -I FORWARD 1 -s 10.93.4.83 -j DROP
+iptables -I FORWARD 1 -d 10.93.4.83 -j DROP
+iptables -I INPUT 1 -s 10.93.4.83 -j DROP
+iptables -I OUTPUT 1 -d 10.93.4.83 -j DROP
+
+iptables-save > /root/shigeru.rules 2>/dev/null || true
+echo "Isolasi Layer-3 Armisael di Shigeru aktif."
+
+```
+
+Beri izin eksekusi dan jalankan di **Shigeru**:
+
+```bash
+chmod +x /root/soal19_shigeru.sh
+/root/soal19_shigeru.sh
+
+```
+
+#### 2. Pembuatan Skrip Isolasi Layer-2 di Switch-Monolith / Zeruel
+
+* **Opsi A — Jika Switch-Monolith adalah container Linux Bridge / Open vSwitch**, jalankan di node **Switch-Monolith** `nano /root/soal19_switch.sh`:
+```bash
+#!/bin/sh
+command -v ebtables >/dev/null 2>&1 || { apt-get update -qq && apt-get install -y -qq ebtables; }
+ARMISAEL_MAC=$(ip neigh show 10.93.4.83 | awk '{print $5}')
+ebtables -F
+if [ -n "$ARMISAEL_MAC" ]; then
+    ebtables -A INPUT -s "$ARMISAEL_MAC" -j DROP
+    ebtables -A FORWARD -s "$ARMISAEL_MAC" -j DROP
+    ebtables -A FORWARD -d "$ARMISAEL_MAC" -j DROP
+    ebtables -A OUTPUT -d "$ARMISAEL_MAC" -j DROP
+fi
+ebtables -A FORWARD -p IPv4 --ip-src 10.93.4.83 -j DROP
+ebtables -A FORWARD -p IPv4 --ip-dst 10.93.4.83 -j DROP
+
+```
+
+
+```bash
+chmod +x /root/soal19_switch.sh
+/root/soal19_switch.sh
+
+```
+
+
+* **Opsi B — Jika Switch-Monolith menggunakan Ethernet Switch bawaan GNS3**, jalankan isolasi tetangga satu switch pada node **Zeruel** `nano /root/soal19_zeruel.sh`:
+```bash
+#!/bin/sh
+iptables -D INPUT -s 10.93.4.83 -j DROP 2>/dev/null || true
+iptables -D OUTPUT -d 10.93.4.83 -j DROP 2>/dev/null || true
+iptables -I INPUT 1 -s 10.93.4.83 -j DROP
+iptables -I OUTPUT 1 -d 10.93.4.83 -j DROP
+
+```
+
+
+```bash
+chmod +x /root/soal19_zeruel.sh
+/root/soal19_zeruel.sh
+
+```
+
+
+
+#### 3. Menyalakan Listener TCP Port 9000 pada Node Uji
+
+Jalankan perintah berikut pada node **Armisael**, **Zeruel**, dan **Lilith** masing-masing:
+
+```bash
+pkill -f "nc -l -p 9000" 2>/dev/null || true
+nohup sh -c 'while true; do echo "Respon dari $(hostname)" | nc -l -p 9000; done' >/dev/null 2>&1 &
+netstat -tuln | grep 9000
+
+```
+
+### Testing
+
+Pengujian Soal 19 membuktikan isolasi total terhadap Armisael sekaligus kelancaran koneksi bagi Zeruel:
+
+1. **Membuktikan Ping dan `nc` dari Armisael ke Seele, Zeruel, dan Lilith Semuanya Gagal**
+Jalankan di node **Armisael**:
+```bash
+# Uji Ping ke Gateway, Seele (8.8.8.8), Zeruel, dan Lilith
+ping -c 2 -W 2 10.93.4.81
+ping -c 2 -W 2 8.8.8.8
+ping -c 2 -W 2 10.93.4.82
+ping -c 2 -W 2 10.93.4.74
+
+# Uji Netcat ke Seele (TCP 53), Zeruel (TCP 9000), dan Lilith (TCP 9000)
+nc -zv -w 2 8.8.8.8 53; echo "exit=$?"
+nc -zv -w 2 10.93.4.82 9000; echo "exit=$?"
+nc -zv -w 2 10.93.4.74 9000; echo "exit=$?"
+
+```
+
+
+*Hasil:* Seluruh pengujian ping menghasilkan **100% packet loss** dan seluruh pengujian `nc` gagal dengan **`exit=1`**.
+2. **Membuktikan Ping dan `nc` dari Zeruel ke Seele dan Lilith Berhasil (Tidak Ikut Terhukum)**
+Jalankan di node **Zeruel**:
+```bash
+# Uji Ping ke Seele (8.8.8.8) dan Lilith (10.93.4.74)
+ping -c 2 8.8.8.8
+ping -c 2 10.93.4.74
+
+# Uji Netcat ke Seele (TCP 53) dan Lilith (TCP 9000)
+nc -zv -w 2 8.8.8.8 53; echo "exit=$?"
+nc -w 2 10.93.4.74 9000; echo "exit=$?"
+
+```
+
+
+*Hasil:*
+* Ping ke `8.8.8.8` dan `10.93.4.74` berhasil (**0% packet loss**).
+* Netcat ke `8.8.8.8:53` (`open`, `exit=0`) dan ke `10.93.4.74:9000` menampilkan `Respon dari Lilith` (`exit=0`).
+
+
+3. **Membuktikan Lilith Juga Tidak Bisa Menghubungi Port 9000 Armisael**
+Jalankan di node **Lilith**:
+```bash
+nc -zv -w 2 10.93.4.83 9000; echo "exit=$?"
+
+```
+
+
+*Hasil:* Gagal (`exit=1`), membuktikan isolasi dua arah berjalan sempurna.
 
 ---
 
 ## Soal 20
-> Penafsiran soal dan secara ringkas kita disuruh ngapain aja
 
-1. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
-      ```bash
-      # Contoh kode perintah
-      ini kode
-      ```
-      
-      atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-      ```
-      isi script
-      ```
-2. Untuk [tujuan perintah/skenario], jalankan perintah berikut di `node apa` :
+* Memilih tiga node sendiri untuk uji pemulihan bencana (*disaster recovery*), minimal satu router
+* Menyimpan aturan firewall tiap node ke `/root/<nama>.rules` menggunakan `iptables-save`
+* Menghapus seluruh rule `iptables` (termasuk tabel `nat`) dan menghapus rute tambahan
+* Memulihkan firewall dengan `iptables-restore` dan rute dengan `/root/<nama>.sh` sebanyak **dua kali berturut-turut**
+* Membuktikan jumlah baris `iptables -S` dan `iptables -t nat -S` sama setelah pemulihan pertama dan kedua (idempoten, tidak dobel)
+* Membuktikan ketiga node kembali berfungsi normal seperti semula
 
-    ```bash
-    # Contoh kode perintah
-    ini kode
-    ```
+> Pada soal ini, dilakukan simulasi pemulihan cepat (*disaster recovery*) pada tiga node utama Geofront:
+> 1. **Gendou** *(Router Pusat)*: Menyimpan konfigurasi firewall filtering dan NAT ke `/root/gendou.rules` serta rute statis hierarkis pada `/root/gendou.sh`.
+> 2. **Tokyo3-Core** *(Server Pusat Komando)*: Menyimpan konfigurasi rate-limiting ICMP dan deteksi port scanning ke `/root/tokyo3.rules` serta layanan web port 80/8080 pada `/root/tokyo3.sh`.
+> 3. **Magi-Balthasar** *(Server Brankas MAGI)*: Menyimpan konfigurasi whitelist port TCP 5000 & 5001 ke `/root/balthasar.rules` serta layanan listener pada `/root/balthasar.sh`.
+> 
+> 
+> Pengujian dilakukan dengan menghapus seluruh aturan `iptables` (tabel `filter` dan `nat`) beserta tabel rute, lalu memulihkannya sebanyak dua kali berturut-turut untuk memverifikasi sifat **idempoten** (aturan dan rute tidak terduplikasi).
+
+### Langkah Pengerjaan
+
+#### 1. Node 1: Router **Gendou**
+
+Simpan aturan firewall aktif ke `/root/gendou.rules`, lalu buat dan jalankan skrip uji pemulihan dua kali berturut-turut di **Gendou**:
+
+```bash
+iptables-save > /root/gendou.rules
+
+```
+
+Di Node **Gendou** `nano /root/soal20_gendou.sh`:
+
+```bash
+#!/bin/sh
+echo "=== 1. PENGHAPUSAN TOTAL FIREWALL & RUTE TAMBAHAN DI GENDOU ==="
+iptables -P INPUT ACCEPT
+iptables -P FORWARD ACCEPT
+iptables -P OUTPUT ACCEPT
+iptables -F
+iptables -X
+iptables -t nat -F
+iptables -t nat -X
+
+# Hapus seluruh static route internal 10.93.0.0/16 (kecuali rute connected proto kernel)
+ip route show | grep '^10\.93\.' | grep -v 'proto kernel' | while read -r route; do
+    ip route del $route 2>/dev/null || true
+done
+
+echo "Rule filter setelah flush : $(iptables -S | wc -l) baris"
+echo "Rule NAT setelah flush    : $(iptables -t nat -S | wc -l) baris"
+echo "Rute statis setelah hapus : $(ip route show | grep '^10\.93\.' | grep -v 'proto kernel' | wc -l) baris"
+
+echo ""
+echo "=== 2. PEMULIHAN PERTAMA ==="
+/root/gendou.sh
+iptables-restore < /root/gendou.rules
+F1=$(iptables -S | wc -l)
+N1=$(iptables -t nat -S | wc -l)
+R1=$(ip route show | grep '^10\.93\.' | grep -v 'proto kernel' | wc -l)
+echo "Pemulihan 1 -> iptables -S: $F1 baris | iptables -t nat -S: $N1 baris \vert{} static route:$R1 baris"
+
+echo ""
+echo "=== 3. PEMULIHAN KEDUA (UJI IDEMPOTENSI) ==="
+/root/gendou.sh
+iptables-restore < /root/gendou.rules
+F2=$(iptables -S | wc -l)
+N2=$(iptables -t nat -S | wc -l)
+R2=$(ip route show | grep '^10\.93\.' | grep -v 'proto kernel' | wc -l)
+echo "Pemulihan 2 -> iptables -S: $F2 baris | iptables -t nat -S: $N2 baris \vert{} static route:$R2 baris"
+
+```
+
+```bash
+chmod +x /root/soal20_gendou.sh
+/root/soal20_gendou.sh
+
+```
+
+#### 2. Node 2: **Tokyo3-Core**
+
+Pastikan konfigurasi Soal 16 aktif, simpan ke `/root/tokyo3.rules` dan `/root/tokyo3.sh`, lalu buat dan jalankan skrip uji pemulihan dua kali berturut-turut di **Tokyo3-Core**:
+
+```bash
+cp /root/soal16.sh /root/tokyo3.sh
+chmod +x /root/tokyo3.sh
+/root/tokyo3.sh
+iptables-save > /root/tokyo3.rules
+
+```
+
+Di Node **Tokyo3-Core** `nano /root/soal20_tokyo3.sh`:
+
+```bash
+#!/bin/sh
+echo "=== 1. PENGHAPUSAN TOTAL FIREWALL & DEFAULT ROUTE DI TOKYO3-CORE ==="
+iptables -P INPUT ACCEPT
+iptables -P FORWARD ACCEPT
+iptables -P OUTPUT ACCEPT
+iptables -F
+iptables -X
+iptables -t nat -F
+iptables -t nat -X
+ip route del default 2>/dev/null || true
+
+echo ""
+echo "=== 2. PEMULIHAN PERTAMA ==="
+ip route replace default via 10.93.4.105 dev eth0
+/root/tokyo3.sh
+iptables-restore < /root/tokyo3.rules
+echo "Pemulihan 1 -> iptables -S: $(iptables -S | wc -l) baris | iptables -t nat -S: $(iptables -t nat -S \vert{} wc -l) baris \vert{} default route:$(ip route show default | wc -l) baris"
+
+echo ""
+echo "=== 3. PEMULIHAN KEDUA (UJI IDEMPOTENSI) ==="
+ip route replace default via 10.93.4.105 dev eth0
+/root/tokyo3.sh
+iptables-restore < /root/tokyo3.rules
+echo "Pemulihan 2 -> iptables -S: $(iptables -S | wc -l) baris | iptables -t nat -S: $(iptables -t nat -S \vert{} wc -l) baris \vert{} default route:$(ip route show default | wc -l) baris"
+
+```
+
+```bash
+chmod +x /root/soal20_tokyo3.sh
+/root/soal20_tokyo3.sh
+
+```
+
+#### 3. Node 3: **Magi-Balthasar**
+
+Pastikan konfigurasi Soal 13 aktif, simpan ke `/root/balthasar.rules` dan `/root/balthasar.sh`, lalu buat dan jalankan skrip uji pemulihan dua kali berturut-turut di **Magi-Balthasar**:
+
+```bash
+cp /root/soal13.sh /root/balthasar.sh
+chmod +x /root/balthasar.sh
+/root/balthasar.sh
+iptables-save > /root/balthasar.rules
+
+```
+
+Di Node **Magi-Balthasar** `nano /root/soal20_balthasar.sh`:
+
+```bash
+#!/bin/sh
+echo "=== 1. PENGHAPUSAN TOTAL FIREWALL & DEFAULT ROUTE DI MAGI-BALTHASAR ==="
+iptables -P INPUT ACCEPT
+iptables -P FORWARD ACCEPT
+iptables -P OUTPUT ACCEPT
+iptables -F
+iptables -X
+iptables -t nat -F
+iptables -t nat -X
+ip route del default 2>/dev/null || true
+
+echo ""
+echo "=== 2. PEMULIHAN PERTAMA ==="
+ip route replace default via 10.93.4.57 dev eth0
+/root/balthasar.sh
+iptables-restore < /root/balthasar.rules
+echo "Pemulihan 1 -> iptables -S: $(iptables -S | wc -l) baris | iptables -t nat -S: $(iptables -t nat -S \vert{} wc -l) baris \vert{} default route:$(ip route show default | wc -l) baris"
+
+echo ""
+echo "=== 3. PEMULIHAN KEDUA (UJI IDEMPOTENSI) ==="
+ip route replace default via 10.93.4.57 dev eth0
+/root/balthasar.sh
+iptables-restore < /root/balthasar.rules
+echo "Pemulihan 2 -> iptables -S: $(iptables -S | wc -l) baris | iptables -t nat -S: $(iptables -t nat -S \vert{} wc -l) baris \vert{} default route:$(ip route show default | wc -l) baris"
+
+```
+
+```bash
+chmod +x /root/soal20_balthasar.sh
+/root/soal20_balthasar.sh
+
+```
+
+### Testing
+
+Pengujian Soal 20 membuktikan konsistensi jumlah baris aturan setelah dua kali pemulihan serta pulihnya fungsi operasional pada ketiga node:
+
+1. **Perbandingan Jumlah Baris Pemulihan Pertama dan Kedua (Idempotensi)**
+| Node | Komponen Konfigurasi | Pemulihan 1 | Pemulihan 2 | Status |
+| --- | --- | --- | --- | --- |
+| **Gendou** | `iptables -S` | 10 baris | 10 baris | Sama (Tidak dobel) |
+| **Gendou** | `iptables -t nat -S` | 4 baris | 4 baris | Sama (Tidak dobel) |
+| **Gendou** | Static Route Internal | 24 baris | 24 baris | Sama (Tidak dobel) |
+| **Tokyo3-Core** | `iptables -S` | 10 baris | 10 baris | Sama (Tidak dobel) |
+| **Tokyo3-Core** | `iptables -t nat -S` | 4 baris | 4 baris | Sama (Tidak dobel) |
+| **Tokyo3-Core** | Default Route | 1 baris | 1 baris | Sama (Tidak dobel) |
+| **Magi-Balthasar** | `iptables -S` | 9 baris | 9 baris | Sama (Tidak dobel) |
+| **Magi-Balthasar** | `iptables -t nat -S` | 4 baris | 4 baris | Sama (Tidak dobel) |
+| **Magi-Balthasar** | Default Route | 1 baris | 1 baris | Sama (Tidak dobel) |
+
+
+2. **Membuktikan Fungsi Ketiga Node Kembali Normal Setelah Pemulihan**
+* **Fungsi Gendou (NAT & Routing Antar-LAN):**
+Dari node **Lilith** (`10.93.4.74`), jalankan:
+```bash
+ping -c 2 8.8.8.8
+ping -c 2 10.93.3.130
+
+```
+
+
+*Hasil:* Berhasil (**0% packet loss**), membuktikan NAT Masquerade dan static routing di Gendou pulih sepenuhnya.
+* **Fungsi Tokyo3-Core (Layanan Web & Deteksi Port Scan):**
+Dari node **Lilith**, jalankan:
+```bash
+nc -w 2 10.93.4.106 80
+nc -w 2 10.93.4.106 8080
+
+```
+
+
+*Hasil:* Menampilkan `Welcome to Tokyo3-Core` dan `syifa imutz`.
+* **Fungsi Magi-Balthasar (Proteksi Brankas TCP 5000 & 5001):**
+Dari node **Unit-01** dan **Lilith**, jalankan:
+```bash
+# Dari Unit-01 (Pilot -> diizinkan)
+nc -zv -w 2 10.93.4.59 5000
+# Dari Lilith (Non-Pilot -> ditolak seketika)
+nc -zv -w 2 10.93.4.59 5000
+
+```
+
+
+*Hasil:* Unit-01 berhasil (`open`), sedangkan Lilith ditolak seketika (`Connection refused`).
+
+
+
+```
     
-    atau semisal buat script di `node apa` untuk apa ( SCRIPT HARUS DITULIS DI ROOT SUPAYA BISA AKU DEMONSTRASIKAN ULANG! KARENA KALAU NGGAK DI ROOT BAKAL HILANG`
-    ```
-    isi script
-    ```
-dst terserah butuh berapa step
