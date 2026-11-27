@@ -3534,7 +3534,6 @@ chmod +x /root/soal17_testing.sh
 #### 1. Pembuatan Skrip Firewall Zona Sensitif di Node Shigeru
 
 Di Node **Shigeru** `nano /root/soal18.sh`:
-<details>
 <summary>Lihat skrip <b>/root/soal18.sh</b> di Shigeru</summary>
 
 ```bash
